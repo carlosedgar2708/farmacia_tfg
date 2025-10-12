@@ -2,50 +2,60 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, SoftDeletes;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
-    'name',
-    'apellido',
-    'email',
-    'telefono',
-    'password',
-    'activo',,
+        'username',
+        'name',
+        'apellido',
+        'email',
+        'telefono',
+        'password',
+        'activo',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    // 👇 Agrega esta relación con roles
+    public function rols()
+    {
+        return $this->belongsToMany(Rol::class, 'rol_user', 'user_id', 'rol_id');
+    }
+
+    // Permisos a través de roles
+    public function permisos()
+    {
+        return $this->hasManyThrough(
+            Permiso::class,
+            Rol::class,
+            'id',          // clave local en Rol
+            'id',          // clave local en Permiso
+            'id',          // clave local en User
+            'rol_id'       // FK pivote rol_user
+        );
+    }
+
+
+    public function tienePermiso(string $slug): bool
+    {
+        return $this->rols()->whereHas('permisos', fn($q) => $q->where('slug', $slug))->exists();
     }
 }

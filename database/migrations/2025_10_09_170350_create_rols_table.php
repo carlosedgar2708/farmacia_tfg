@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('rols', function (Blueprint $table) {
             $table->id();
             $table->string('nombre')->unique();
+            $table->string('slug')->unique();
             $table->string('descripcion')->nullable();
             $table->timestamps();
             $table->softDeletes();

@@ -14,8 +14,9 @@ return new class extends Migration
         Schema::create('permisos', function (Blueprint $table) {
             //Los Atributos de mi tablas
             $table->id(); //Primary key , autoincremental, tipo biinteger
-            $table->string('clave')->unique();
-            $table->string('descripcion')->nullable;
+            $table->string('nombre')->unique();   // <-- agrega
+            $table->string('slug')->unique();     // <-- agrega
+            $table->string('descripcion')->nullable(); // <-- opcional
             $table->timestamps();
             $table->softDeletes();
         });
