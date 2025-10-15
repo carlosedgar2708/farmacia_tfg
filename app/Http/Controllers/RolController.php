@@ -36,7 +36,6 @@ class RolController extends Controller
         ]);
 
         Rol::create($validated);
-
         return redirect()->route('rols.index')->with('success', 'Rol creado correctamente.');
     }
 
@@ -59,10 +58,8 @@ class RolController extends Controller
         ]);
 
         $rol->update($validated);
-
         return redirect()->route('rols.index')->with('success', 'Rol actualizado correctamente.');
     }
-
     public function destroy(Rol $rol)
     {
         $rol->delete();

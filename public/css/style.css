@@ -105,3 +105,107 @@ footer{padding:28px 0;color:#6b7280;text-align:center}
   padding:8px 12px;border:1px solid #e5e7eb;border-radius:10px;text-decoration:none;color:#0f172a;background:#fff
 }
 .pagination .active span{background:#0ea5e9;border-color:#0ea5e9;color:#fff}
+
+
+/* --- Modal --- */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(3px);
+}
+
+.modal-content {
+  background-color: #fff;
+  margin: 6% auto;
+  padding: 20px 30px;
+  border-radius: 16px;
+  max-width: 520px;
+  box-shadow: 0 20px 50px rgba(0,0,0,.2);
+  color: #1e293b;
+}
+
+.modal-content h2 {
+  margin-top: 0;
+  color: #1157c2;
+  font-weight: 800;
+}
+
+.modal-content input,
+.modal-content textarea {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  margin-bottom: 12px;
+  font: inherit;
+}
+
+.close {
+  float: right;
+  font-size: 26px;
+  font-weight: bold;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  line-height: 1;
+}
+.close:hover { color: #ef4444; }
+/* Las burbujas son decorativas; que NO capten clicks */
+.bubble { pointer-events: none; z-index: 0; }
+
+/* Asegura que el contenido esté por encima de decoraciones */
+.panel { position: relative; z-index: 2; }
+
+/* Modal encima de todo */
+.modal { z-index: 9999; }
+/* Forzar texto oscuro dentro de la tabla y celdas */
+.table th,
+.table td { color:#0f172a; }
+
+/* Si en algún otro bloque te queda blanco por herencia, puedes usar: */
+.alert-success {
+  background-color: #d1fae5;  /* verde muy claro */
+  color: #065f46;            /* texto verde oscuro */
+  border: 1px solid #10b981; /* verde esmeralda */
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+/* Base de alertas (info/neutral) */
+.alert{
+  padding:12px 14px;
+  border-radius:10px;
+  background:#ecfeff;
+  border:1px solid #a5f3fc;
+  margin:10px 0;
+  color:#155e75;            /* texto azul verdoso oscuro */
+  font-weight:500;
+}
+
+/* Éxito */
+.alert-success{
+  background-color:#d1fae5; /* verde muy claro */
+  border-color:#10b981;
+  color:#065f46;            /* texto verde oscuro */
+}
+
+/* Asegura que dentro de .panel NO se vuelva blanco */
+.panel .alert,
+.panel .alert-success{
+  color:inherit;            /* quita esta línea si la tenías */
+}
+
+/* Mejor: fuerza el color correcto dentro de panel */
+.panel .alert{ color:#155e75; }
+.panel .alert-success{ color:#065f46; }
+
+
+.panel .btn-outline,
+.panel .badge { color:inherit; }  /* o especifica el color que prefieras */
+

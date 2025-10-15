@@ -8,8 +8,7 @@ use Illuminate\Support\Facades\Route;
 Route::get("/", [AuthController::class, 'welcome'])->name('welcome');
 
 
-Route::resource('rol', RolController::class)->names('rols');
-
+Route::resource('rols', RolController::class)->only(['index', 'store', 'update', 'destroy']);
 
 Route::prefix('/permiso')->group(function () {
     Route::get('/', [PermisoController::class, 'index'])->name('mostrar.permiso');
