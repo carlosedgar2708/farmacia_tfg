@@ -217,53 +217,55 @@ window.addEventListener('click', e=>{
 @endsection
 
 @push('modals')
-  <!-- Modal de Crear / Editar Rol -->
-  <div id="rolModal" class="modal" aria-hidden="true">
-    <div class="modal-content">
-      <button class="close" type="button" aria-label="Cerrar" onclick="closeModal()">&times;</button>
-      <h2 id="modalTitle">Nuevo Rol</h2>
+<div id="rolModal" class="modal" aria-hidden="true">
+  <div class="modal-content modal-wide">
+    <button class="close" type="button" aria-label="Cerrar" onclick="closeModal()">&times;</button>
+    <h2 id="modalTitle" class="modal-title">Nuevo Rol</h2>
 
-      <form id="rolForm" method="POST" action="{{ route('rols.store') }}">
-        @csrf
-        <input type="hidden" id="methodField" name="_method" value="POST">
-        <input type="hidden" id="modalMode" value="create"><!-- create|edit para reabrir en errores -->
+    <form id="rolForm" method="POST" action="{{ route('rols.store') }}">
+      @csrf
+      <input type="hidden" id="methodField" name="_method" value="POST">
+      <input type="hidden" id="modalMode" value="create">
 
-        <label for="nombre">Nombre</label>
-        <input type="text" name="nombre" id="nombre" value="{{ old('nombre') }}" required>
+      <!-- GRID 2 COLUMNAS -->
+      <div class="modal-grid">
+        <!-- Columna izquierda: campos -->
+        <div class="modal-col">
+          <label for="nombre">Nombre</label>
+          <input type="text" name="nombre" id="nombre" required>
 
-        <label for="slug">Slug</label>
-        <input type="text" name="slug" id="slug" value="{{ old('slug') }}" required>
+          <label for="slug">Slug</label>
+          <input type="text" name="slug" id="slug" required>
 
-        <label for="descripcion">Descripción</label>
-        <textarea name="descripcion" id="descripcion" rows="3">{{ old('descripcion') }}</textarea>
-
-        <label>Permisos</label>
-            <div class="perm-list">
-            @foreach ($permisos as $perm)
-                <label class="perm-item">
-                <input type="checkbox" name="permisos[]" value="{{ $perm->id }}" class="perm-check">
-                <span>{{ $perm->nombre }}</span>
-                </label>
-            @endforeach
-            </div>
-        {{-- Errores inline --}}
-        @if ($errors->any())
-          <div class="alert" style="background:#fee2e2;border-color:#fecaca;color:#7f1d1d">
-            <ul style="margin:0;padding-left:18px">
-              @foreach ($errors->all() as $error)
-                <li>{{ $error }}</li>
-              @endforeach
-            </ul>
-          </div>
-        @endif
-
-        <div style="margin-top:15px;display:flex;gap:10px">
-          <button type="submit" class="btn" id="submitBtn">Guardar</button>
-          <button type="button" class="btn-outline" onclick="closeModal()">Cancelar</button>
+          <label for="descripcion">Descripción</label>
+          <textarea name="descripcion" id="descripcion" rows="7"></textarea>
         </div>
-      </form>
-    </div>
+
+        <!-- Columna derecha: permisos + acciones -->
+        <div class="modal-col">
+          <label>Permisos</label>
+          <div class="perm-box">
+            <div class="perm-list">
+              @forelse(($permisos ?? collect()) as $perm)
+                <label class="perm-item">
+                  <input type="checkbox" name="permisos[]" value="{{ $perm->id }}" class="perm-check">
+                  <span>{{ $perm->nombre }}</span>
+                </label>
+              @empty
+                <span style="color:#64748b">No hay permisos disponibles.</span>
+              @endforelse
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="submit" class="btn" id="submitBtn">Guardar</button>
+            <button type="button" class="btn btn-outline" id="cancelBtn" onclick="closeModal()">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </form>
   </div>
+</div>
 @endpush
 
 @push('scripts')

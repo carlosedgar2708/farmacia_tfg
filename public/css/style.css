@@ -227,3 +227,77 @@ footer{padding:28px 0;color:#6b7280;text-align:center}
   color:#1e293b;
 }
 .perm-item input{ transform:scale(1.05); }
+
+/* Modal ancho y layout 2 columnas */
+.modal-content.modal-wide{
+  max-width: 980px;            /* ancho mayor */
+  border-radius: 14px;
+}
+
+.modal-title{
+  margin: 0 0 10px 0;
+}
+
+/* Grid de dos columnas: izquierda campos, derecha permisos */
+.modal-grid{
+  display: grid;
+  grid-template-columns: 1.1fr 1fr; /* un poco más de espacio a la izquierda */
+  gap: 18px;
+}
+
+/* Caja que contiene la lista de permisos con scroll agradable */
+.perm-box::-webkit-scrollbar {
+  width: 6px;
+}
+.perm-box::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.perm-box::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Mantén tu grid de permisos (puedes ajustar minmax) */
+.perm-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* fuerza dos columnas */
+  gap: 6px;
+}
+
+.perm-item input {
+  transform: scale(0.95);
+  margin-right: 8px;
+  margin-left: 0;  /* elimina cualquier margen izquierdo */
+}
+
+.perm-item {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 4px 8px 4px 6px; /* menos padding izquierdo */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1e293b;
+  font-size: 15px;
+  line-height: 1.4;
+  letter-spacing: 0.3px;
+}
+.perm-item span {
+  white-space: nowrap;
+}
+
+/* Footer de acciones (en la derecha) */
+.modal-actions{
+  margin-top: 12px;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end; /* o flex-end si los quieres pegados a la derecha */
+}
+
+/* Responsive: en pantallas pequeñas, una sola columna */
+@media (max-width: 720px){
+  .modal-content.modal-wide{ max-width: 92vw; }
+  .modal-grid{ grid-template-columns: 1fr; }
+  .perm-box{ max-height: 260px; }
+}
