@@ -258,33 +258,32 @@ footer{padding:28px 0;color:#6b7280;text-align:center}
 }
 
 /* Mantén tu grid de permisos (puedes ajustar minmax) */
-.perm-list {
+.perm-list{
   display: grid;
-  grid-template-columns: repeat(2, 1fr); /* fuerza dos columnas */
+  grid-template-columns: repeat(2, 1fr);
   gap: 6px;
 }
 
-.perm-item input {
-  transform: scale(0.95);
-  margin-right: 8px;
-  margin-left: 0;  /* elimina cualquier margen izquierdo */
+.perm-item input{
+  margin: 0 !important;          /* nada de márgenes */
+  justify-self: start !important; /* pegado al inicio de la celda */
+  transform: scale(0.95);         /* opcional, un pelín más pequeño */
 }
 
-.perm-item {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 4px 8px 4px 6px; /* menos padding izquierdo */
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #1e293b;
-  font-size: 15px;
-  line-height: 1.4;
-  letter-spacing: 0.3px;
+.perm-item{
+  /* grid de 2 columnas: [checkbox][texto] */
+  display: grid !important;
+  grid-template-columns: 18px 1fr !important; /* 18px ≈ ancho del checkbox */
+  align-items: center !important;
+  gap: 6px !important;
+
+  /* sin espacio izquierdo para que el check quede al ras */
+  padding: 4px 8px 4px 0 !important; /* 0 a la izquierda */
 }
-.perm-item span {
-  white-space: nowrap;
+.perm-item span{
+  margin: 0 !important;
+  line-height: 1.4;
+  letter-spacing: .2px;
 }
 
 /* Footer de acciones (en la derecha) */
