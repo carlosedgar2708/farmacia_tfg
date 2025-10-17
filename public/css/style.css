@@ -1,302 +1,218 @@
+/* =========================================================
+   0) Variables & Base
+   ========================================================= */
 :root{
-  --c1:#1fb6ff; --c2:#35c2f5; --c3:#3fd0ff; --c4:#69e0ff; --ink:#1f2937;
-  --desk:#1157c2;
-}
-*{box-sizing:border-box}
-body{margin:0;font-family:Poppins,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);}
-
-/* header */
-.wrap{max-width:1200px;margin:0 auto;padding:0 24px;}
-.header{padding:22px 0;display:flex;align-items:center;justify-content:space-between;}
-.logo{font-weight:800;font-size:24px;letter-spacing:.5px}
-.nav a{margin-left:28px;text-decoration:none;color:var(--ink);font-weight:600}
-.nav a:hover{color:#0ea5e9}
-
-/* layout */
-.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
-.hero{position:relative;min-height:460px}
-.panel{position:relative;border-radius:20px;background:var(--desk);padding:24px;box-shadow:0 25px 50px -12px rgba(0,0,0,.25);color:#fff}
-.shelf{display:none}
-.cross{width:48px;height:48px;background:#fff;border-radius:4px;margin:18px auto 0}
-.shadow{height:22px;width:75%;margin:10px auto 0;background:rgba(0,0,0,.28);filter:blur(6px);border-radius:999px}
-
-/* left text */
-h1{margin:0;line-height:1.05}
-.h-top{font-size:54px;color:#38bdf8;font-weight:800}
-.h-sub{font-size:44px;color:#7dd3fc;font-weight:800}
-p{margin-top:18px;max-width:560px;color:#475569}
-.btn{display:inline-block;margin-top:28px;padding:14px 28px;border-radius:999px;color:#fff;
-     font-weight:600;background:linear-gradient(135deg,#2bb3ff 0%,#69e0ff 100%);text-decoration:none}
-.btn:hover{opacity:.9}
-
-/* image */
-.imgbox{background:rgba(255,255,255,.1);backdrop-filter:blur(2px);border-radius:16px;padding:10px}
-.imgbox img{width:100%;height:260px;object-fit:contain;border-radius:12px;background:#fff}
-
-/* bubbles */
-.bubble{position:absolute;border-radius:9999px;opacity:.3;filter:blur(.5px)}
-.b1{width:220px;height:220px;right:-40px;top:20px;background:var(--c1)}
-.b2{width:180px;height:180px;right:120px;top:100px;background:var(--c3)}
-.b3{width:140px;height:140px;right:40px; top:230px;background:var(--c2)}
-.b4{width:90px; height:90px; right:220px;top:20px; background:#7be3ff}
-.b5{width:60px; height:60px; right:280px;top:250px;background:#a8efff}
-
-/* shelf (fake products) */
-.rack{height:260px;background:#0f5baa;border-radius:12px;padding:10px;display:flex;flex-direction:column;justify-content:space-between}
-.row{display:flex;gap:8px}
-.p1,.p2,.p3,.p4,.p5{border-radius:6px;background:#fff}
-.p1{width:34px;height:34px}.p2{width:24px;height:34px;background:#5cc9ff}
-.p3{width:46px;height:34px}.p4{width:60px;height:34px;background:#5cc9ff}
-.p5{width:30px;height:34px}
-
-/* footer */
-footer{padding:28px 0;color:#6b7280;text-align:center}
-
-/* responsive */
-@media (min-width:1024px){
-  .shelf{display:block;width:160px}
-}
-@media (max-width:900px){
-  .grid{grid-template-columns:1fr;gap:28px}
-  .hero{min-height:auto}
-  .h-top{font-size:44px}.h-sub{font-size:34px}
-  .nav{display:none}
-  .b1,.b2,.b3,.b4,.b5{display:none}
+  --c1:#1fb6ff; --c2:#35c2f5; --c3:#3fd0ff; --c4:#69e0ff;
+  --ink:#1f2937; --desk:#1157c2;
 }
 
+*{ box-sizing:border-box }
+body{
+  margin:0;
+  font-family:Poppins,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  color:var(--ink);
+}
 
+/* =========================================================
+   1) Layout & Header
+   ========================================================= */
+.wrap{ max-width:1200px; margin:0 auto; padding:0 24px }
+.header{ padding:22px 0; display:flex; align-items:center; justify-content:space-between }
+.logo{ font-weight:800; font-size:24px; letter-spacing:.5px }
+.nav a{ margin-left:28px; text-decoration:none; color:var(--ink); font-weight:600 }
+.nav a:hover{ color:#0ea5e9 }
 
+/* =========================================================
+   2) Hero / Panel / Shadow
+   ========================================================= */
+.grid{ display:grid; grid-template-columns:1.1fr .9fr; gap:40px; align-items:center }
+.hero{ position:relative; min-height:460px }
+.panel{
+  position:relative; border-radius:20px; background:var(--desk); color:#fff;
+  padding:24px; box-shadow:0 25px 50px -12px rgba(0,0,0,.25)
+}
+.shadow{ height:22px; width:75%; margin:10px auto 0; background:rgba(0,0,0,.28); filter:blur(6px); border-radius:999px }
 
-/* ---- Roles page ---- */
-.toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:10px 0 18px}
-.search{position:relative}
+/* =========================================================
+   3) Typography & Buttons
+   ========================================================= */
+h1{ margin:0; line-height:1.05 }
+.h-top{ font-size:54px; color:#38bdf8; font-weight:800 }
+.h-sub{ font-size:44px; color:#7dd3fc; font-weight:800 }
+p{ margin-top:18px; max-width:560px; color:#475569 }
+
+.btn{
+  display:inline-block; margin-top:28px; padding:14px 28px; border-radius:999px;
+  color:#fff; font-weight:600; text-decoration:none;
+  background:linear-gradient(135deg,#2bb3ff 0%,#69e0ff 100%)
+}
+.btn:hover{ opacity:.9 }
+
+.btn-outline{
+  display:inline-block; padding:10px 14px; border-radius:10px; font-weight:600;
+  background:#fff; color:#0f172a; text-decoration:none; border:1px solid #cbd5e1
+}
+.btn-outline:hover{ background:#f8fafc }
+
+/* =========================================================
+   4) Images & Decorative (bubbles / shelf demo)
+   ========================================================= */
+.imgbox{ background:rgba(255,255,255,.1); backdrop-filter:blur(2px); border-radius:16px; padding:10px }
+.imgbox img{ width:100%; height:260px; object-fit:contain; border-radius:12px; background:#fff }
+
+.bubble{ position:absolute; border-radius:9999px; opacity:.3; filter:blur(.5px); pointer-events:none; z-index:0 }
+.b1{ width:220px; height:220px; right:-40px; top:20px; background:var(--c1) }
+.b2{ width:180px; height:180px; right:120px; top:100px; background:var(--c3) }
+.b3{ width:140px; height:140px; right:40px;  top:230px; background:var(--c2) }
+.b4{ width:90px;  height:90px;  right:220px; top:20px;  background:#7be3ff }
+.b5{ width:60px;  height:60px;  right:280px; top:250px; background:#a8efff }
+
+.shelf{ display:none }
+.rack{ height:260px; background:#0f5baa; border-radius:12px; padding:10px; display:flex; flex-direction:column; justify-content:space-between }
+.row{ display:flex; gap:8px }
+.p1,.p2,.p3,.p4,.p5{ border-radius:6px; background:#fff }
+.p1{ width:34px; height:34px }
+.p2{ width:24px; height:34px; background:#5cc9ff }
+.p3{ width:46px; height:34px }
+.p4{ width:60px; height:34px; background:#5cc9ff }
+.p5{ width:30px; height:34px }
+
+/* =========================================================
+   5) Footer
+   ========================================================= */
+footer{ padding:28px 0; color:#6b7280; text-align:center }
+
+/* =========================================================
+   6) Roles Page Components
+   ========================================================= */
+.toolbar{ display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; margin:10px 0 18px }
+.search{ position:relative }
 .search input{
-  height:42px;padding:0 42px 0 14px;border:1px solid #e5e7eb;border-radius:10px;outline:none;
-  font:inherit;width:240px;max-width:100%;
+  height:42px; padding:0 42px 0 14px; width:240px; max-width:100%;
+  border:1px solid #e5e7eb; border-radius:10px; outline:none; font:inherit
 }
 .search button{
-  position:absolute;right:6px;top:6px;height:30px;border:0;border-radius:8px;
-  padding:0 10px;font-weight:600;background:#0ea5e9;color:#fff;cursor:pointer;
+  position:absolute; right:6px; top:6px; height:30px; padding:0 10px;
+  border:0; border-radius:8px; font-weight:600; background:#0ea5e9; color:#fff; cursor:pointer
 }
-.btn-outline{display:inline-block;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;
-  text-decoration:none;color:#0f172a;background:#fff;font-weight:600}
-.btn-outline:hover{background:#f8fafc}
 
-.table{width:100%;border-collapse:separate;border-spacing:0 10px}
-.table th{font-weight:700;text-align:left;color:#334155;padding:10px 12px}
-.table td{background:#fff;padding:14px 12px;vertical-align:middle;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb}
-.table tr td:first-child{border-left:1px solid #e5e7eb;border-top-left-radius:12px;border-bottom-left-radius:12px}
-.table tr td:last-child{border-right:1px solid #e5e7eb;border-top-right-radius:12px;border-bottom-right-radius:12px}
+/* Table */
+.table{ width:100%; border-collapse:separate; border-spacing:0 10px }
+.table th{ font-weight:700; text-align:left; color:#334155; padding:10px 12px }
+.table td{
+  background:#fff; color:#0f172a; padding:14px 12px; vertical-align:middle;
+  border-top:1px solid #e5e7eb; border-bottom:1px solid #e5e7eb
+}
+.table tr td:first-child{ border-left:1px solid #e5e7eb; border-top-left-radius:12px; border-bottom-left-radius:12px }
+.table tr td:last-child{ border-right:1px solid #e5e7eb; border-top-right-radius:12px; border-bottom-right-radius:12px }
 
-.badge{display:inline-block;padding:4px 10px;border-radius:999px;background:#e0f2fe;color:#0369a1;font-weight:600;font-size:12px}
-.actions{display:flex;gap:8px;flex-wrap:wrap}
-.action{padding:8px 12px;border-radius:10px;font-weight:600;text-decoration:none;display:inline-block}
-.action.view{background:#cffafe;color:#0e7490}
-.action.edit{background:#dbeafe;color:#1e40af}
-.action.delete{background:#fee2e2;color:#991b1b}
-.action:hover{filter:brightness(.98)}
+/* Badges & Action buttons */
+.badge{ display:inline-block; padding:4px 10px; border-radius:999px; background:#e0f2fe; color:#0369a1; font-weight:600; font-size:12px }
+.actions{ display:flex; gap:8px; flex-wrap:wrap }
+.action{ padding:8px 12px; border-radius:10px; font-weight:600; text-decoration:none; display:inline-block }
+.action.view{ background:#cffafe; color:#0e7490 }
+.action.edit{ background:#dbeafe; color:#1e40af }
+.action.delete{ background:#fee2e2; color:#991b1b }
+.action:hover{ filter:brightness(.98) }
 
-.alert{padding:12px 14px;border-radius:10px;background:#ecfeff;color:#155e75;border:1px solid #a5f3fc;margin:10px 0}
-.empty{padding:26px;border:1px dashed #cbd5e1;border-radius:14px;background:#fff;color:#64748b;text-align:center}
+/* Alerts */
+.alert{
+  padding:12px 14px; border-radius:10px; margin:10px 0;
+  background:#ecfeff; border:1px solid #a5f3fc; color:#155e75; font-weight:500
+}
+.alert-success{ background:#d1fae5; border-color:#10b981; color:#065f46 }
 
-/* paginación sencilla (si usas links() de Laravel con Tailwind desactivado) */
-.pagination{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+/* Empty state */
+.empty{
+  padding:26px; border:1px dashed #cbd5e1; border-radius:14px;
+  background:#fff; color:#64748b; text-align:center
+}
+
+/* Pagination (simple) */
+.pagination{ display:flex; gap:8px; flex-wrap:wrap; align-items:center }
 .pagination a,.pagination span{
-  padding:8px 12px;border:1px solid #e5e7eb;border-radius:10px;text-decoration:none;color:#0f172a;background:#fff
+  padding:8px 12px; border:1px solid #e5e7eb; border-radius:10px; text-decoration:none; color:#0f172a; background:#fff
 }
-.pagination .active span{background:#0ea5e9;border-color:#0ea5e9;color:#fff}
+.pagination .active span{ background:#0ea5e9; border-color:#0ea5e9; color:#fff }
 
-
-/* --- Modal --- */
-.modal {
-  display: none;
-  position: fixed;
-  z-index: 1000;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: auto;
-  background: rgba(0,0,0,0.5);
-  backdrop-filter: blur(3px);
+/* =========================================================
+   7) Modal (base + wide + grid)
+   ========================================================= */
+.modal{
+  display:none; position:fixed; inset:0; width:100%; height:100%;
+  overflow:auto; background:rgba(0,0,0,.5); backdrop-filter:blur(3px);
+  z-index:9999
 }
-
-.modal-content {
-  background-color: #fff;
-  margin: 6% auto;
-  padding: 20px 30px;
-  border-radius: 16px;
-  max-width: 520px;
-  box-shadow: 0 20px 50px rgba(0,0,0,.2);
-  color: #1e293b;
+.modal-content{
+  background:#fff; color:#1e293b; margin:6% auto; padding:20px 30px;
+  border-radius:16px; max-width:520px; box-shadow:0 20px 50px rgba(0,0,0,.2)
 }
-
-.modal-content h2 {
-  margin-top: 0;
-  color: #1157c2;
-  font-weight: 800;
-}
+.modal-content.modal-wide{ max-width:980px; border-radius:14px }
+.modal-title{ margin:0 0 10px 0 }
 
 .modal-content input,
-.modal-content textarea {
-  width: 100%;
-  padding: 10px;
-  border-radius: 10px;
-  border: 1px solid #d1d5db;
-  margin-bottom: 12px;
-  font: inherit;
+.modal-content textarea{
+  width:100%; padding:10px; margin-bottom:12px; font:inherit;
+  border:1px solid #d1d5db; border-radius:10px
 }
 
-.close {
-  float: right;
-  font-size: 26px;
-  font-weight: bold;
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-  line-height: 1;
+.close{
+  float:right; font-size:26px; font-weight:700; cursor:pointer;
+  background:transparent; border:0; line-height:1
 }
-.close:hover { color: #ef4444; }
-/* Las burbujas son decorativas; que NO capten clicks */
-.bubble { pointer-events: none; z-index: 0; }
+.close:hover{ color:#ef4444 }
 
-/* Asegura que el contenido esté por encima de decoraciones */
-.panel { position: relative; z-index: 2; }
+/* Modal grid (left form + right permissions) */
+.modal-grid{ display:grid; grid-template-columns:1.1fr 1fr; gap:18px }
+.modal-actions{ margin-top:12px; display:flex; gap:12px; justify-content:flex-end }
 
-/* Modal encima de todo */
-.modal { z-index: 9999; }
-/* Forzar texto oscuro dentro de la tabla y celdas */
-.table th,
-.table td { color:#0f172a; }
-
-/* Si en algún otro bloque te queda blanco por herencia, puedes usar: */
-.alert-success {
-  background-color: #d1fae5;  /* verde muy claro */
-  color: #065f46;            /* texto verde oscuro */
-  border: 1px solid #10b981; /* verde esmeralda */
-  padding: 10px 15px;
-  border-radius: 8px;
-  font-weight: 500;
+/* =========================================================
+   8) Permissions UI
+   ========================================================= */
+.perm-box{
+  background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px;
+  padding:10px; max-height:360px; overflow:auto
 }
-/* Base de alertas (info/neutral) */
-.alert{
-  padding:12px 14px;
-  border-radius:10px;
-  background:#ecfeff;
-  border:1px solid #a5f3fc;
-  margin:10px 0;
-  color:#155e75;            /* texto azul verdoso oscuro */
-  font-weight:500;
-}
+/* Scroll visual */
+.perm-box::-webkit-scrollbar{ width:6px }
+.perm-box::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:4px }
+.perm-box::-webkit-scrollbar-thumb:hover{ background:#94a3b8 }
 
-/* Éxito */
-.alert-success{
-  background-color:#d1fae5; /* verde muy claro */
-  border-color:#10b981;
-  color:#065f46;            /* texto verde oscuro */
-}
+/* Grid de items: 2 columnas */
+.perm-list{ display:grid; grid-template-columns:repeat(2,1fr); gap:6px }
 
-/* Asegura que dentro de .panel NO se vuelva blanco */
-.panel .alert,
-.panel .alert-success{
-  color:inherit;            /* quita esta línea si la tenías */
-}
-
-/* Mejor: fuerza el color correcto dentro de panel */
-.panel .alert{ color:#155e75; }
-.panel .alert-success{ color:#065f46; }
-
-
-.panel .btn-outline,
-.panel .badge { color:inherit; }  /* o especifica el color que prefieras */
-
-/* para los permisos*/
-.perm-list{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
-  gap:8px;
-  margin-bottom:12px;
-}
+/* Item: checkbox pegado a la izquierda + texto */
 .perm-item{
-  background:#f9fafb;
-  border:1px solid #e5e7eb;
-  border-radius:8px;
-  padding:6px 10px;
-  display:flex;
-  align-items:center;
-  gap:8px;
-  color:#1e293b;
+  display:grid !important; grid-template-columns:18px 1fr !important;
+  align-items:center !important; gap:6px !important;
+  padding:4px 8px 4px 0 !important; /* 0 a la izquierda para pegar el check */
+  background:#fff; border:1px solid #e5e7eb; border-radius:8px; color:#1e293b;
 }
-.perm-item input{ transform:scale(1.05); }
+.perm-item input{ margin:0 !important; justify-self:start !important; transform:scale(.95) }
+.perm-item span{ margin:0 !important; line-height:1.4; letter-spacing:.2px }
 
-/* Modal ancho y layout 2 columnas */
-.modal-content.modal-wide{
-  max-width: 980px;            /* ancho mayor */
-  border-radius: 14px;
-}
+/* =========================================================
+   9) Utilities
+   ========================================================= */
+.panel{ position:relative; z-index:2 } /* asegura panel sobre burbujas */
 
-.modal-title{
-  margin: 0 0 10px 0;
-}
-
-/* Grid de dos columnas: izquierda campos, derecha permisos */
-.modal-grid{
-  display: grid;
-  grid-template-columns: 1.1fr 1fr; /* un poco más de espacio a la izquierda */
-  gap: 18px;
+/* =========================================================
+   10) Responsive
+   ========================================================= */
+@media (min-width:1024px){
+  .shelf{ display:block; width:160px }
 }
 
-/* Caja que contiene la lista de permisos con scroll agradable */
-.perm-box::-webkit-scrollbar {
-  width: 6px;
-}
-.perm-box::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-.perm-box::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+@media (max-width:900px){
+  .grid{ grid-template-columns:1fr; gap:28px }
+  .hero{ min-height:auto }
+  .h-top{ font-size:44px } .h-sub{ font-size:34px }
+  .nav{ display:none }
+  .b1,.b2,.b3,.b4,.b5{ display:none }
 }
 
-/* Mantén tu grid de permisos (puedes ajustar minmax) */
-.perm-list{
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-}
-
-.perm-item input{
-  margin: 0 !important;          /* nada de márgenes */
-  justify-self: start !important; /* pegado al inicio de la celda */
-  transform: scale(0.95);         /* opcional, un pelín más pequeño */
-}
-
-.perm-item{
-  /* grid de 2 columnas: [checkbox][texto] */
-  display: grid !important;
-  grid-template-columns: 18px 1fr !important; /* 18px ≈ ancho del checkbox */
-  align-items: center !important;
-  gap: 6px !important;
-
-  /* sin espacio izquierdo para que el check quede al ras */
-  padding: 4px 8px 4px 0 !important; /* 0 a la izquierda */
-}
-.perm-item span{
-  margin: 0 !important;
-  line-height: 1.4;
-  letter-spacing: .2px;
-}
-
-/* Footer de acciones (en la derecha) */
-.modal-actions{
-  margin-top: 12px;
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end; /* o flex-end si los quieres pegados a la derecha */
-}
-
-/* Responsive: en pantallas pequeñas, una sola columna */
-@media (max-width: 720px){
-  .modal-content.modal-wide{ max-width: 92vw; }
-  .modal-grid{ grid-template-columns: 1fr; }
-  .perm-box{ max-height: 260px; }
+@media (max-width:720px){
+  .modal-content.modal-wide{ max-width:92vw }
+  .modal-grid{ grid-template-columns:1fr }
+  .perm-box{ max-height:260px }
 }
