@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Rol;
+use App\Models\Permiso;
 use Illuminate\Http\Request;
 
 class RolController extends Controller
@@ -12,14 +13,16 @@ class RolController extends Controller
         $q = $request->get('q');
 
         $rols = Rol::query()
-            ->when($q, fn($query) =>
-                $query->where('nombre', 'like', "%{$q}%")
-                      ->orWhere('slug', 'like', "%{$q}%")
-            )
-            ->orderBy('id', 'desc')
+            ->when($q, fn($qr) => $qr->where('nombre','like',"%{$q}%")
+                                    ->orWhere('slug','like',"%{$q}%"))
+            ->with('permisos:id')          // si ya definiste la relación permisos() en Rol
+            ->orderBy('id','desc')
             ->paginate(10);
 
-        return view('rols.index', compact('rols'));
+        // 👇 ESTA LÍNEA ES LA QUE FALTABA
+        $permisos = Permiso::orderBy('nombre')->get(['id','nombre']);
+
+        return view('rols.index', compact('rols','permisos'));
     }
 
     public function create()

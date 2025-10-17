@@ -209,3 +209,21 @@ footer{padding:28px 0;color:#6b7280;text-align:center}
 .panel .btn-outline,
 .panel .badge { color:inherit; }  /* o especifica el color que prefieras */
 
+/* para los permisos*/
+.perm-list{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:8px;
+  margin-bottom:12px;
+}
+.perm-item{
+  background:#f9fafb;
+  border:1px solid #e5e7eb;
+  border-radius:8px;
+  padding:6px 10px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:#1e293b;
+}
+.perm-item input{ transform:scale(1.05); }

@@ -105,3 +105,85 @@ window.addEventListener("click", (e)=>{
     }
   });
 })();
+
+//para marcar casillas de permisos
+function clearAllPerms(){
+  document.querySelectorAll('.perm-check').forEach(c => c.checked = false);
+}
+function setPermsChecked(ids){
+  const want = new Set((ids||[]).map(Number));
+  document.querySelectorAll('.perm-check').forEach(c => {
+    c.checked = want.has(Number(c.value));
+  });
+}
+function disablePerms(disabled){
+  document.querySelectorAll('.perm-check').forEach(c => c.disabled = disabled);
+}
+
+function openCreateModal(){
+  showModal();
+  document.getElementById("modalTitle").innerText = "Nuevo Rol";
+  document.getElementById("rolForm").action = window.routesRolsStore;
+  document.getElementById("methodField").value = "POST";
+  document.getElementById("modalMode").value = "create";
+
+  document.getElementById("nombre").value = "";
+  document.getElementById("slug").value = "";
+  document.getElementById("descripcion").value = "";
+
+  setFormDisabled(false);
+  clearAllPerms();           // 👈 nada marcado
+  disablePerms(false);
+
+  const submit = document.getElementById("submitBtn");
+  submit.style.display = "";
+  submit.innerText = "Guardar";
+  document.getElementById("cancelBtn").innerText = "Cancelar";
+}
+
+function openEditModal(btn){
+  const id = btn.dataset.id;
+  const permisos = (btn.dataset.permisos || "")
+      .split(",").filter(Boolean).map(n => Number(n));
+
+  showModal();
+  document.getElementById("modalTitle").innerText = "Editar Rol";
+  document.getElementById("rolForm").action = "/rols/" + id;
+  document.getElementById("methodField").value = "PUT";
+  document.getElementById("modalMode").value = "edit";
+
+  document.getElementById("nombre").value = btn.dataset.nombre || "";
+  document.getElementById("slug").value = btn.dataset.slug || "";
+  document.getElementById("descripcion").value = btn.dataset.descripcion || "";
+
+  setFormDisabled(false);
+  setPermsChecked(permisos); // 👈 marca los del rol
+  disablePerms(false);
+
+  const submit = document.getElementById("submitBtn");
+  submit.style.display = "";
+  submit.innerText = "Actualizar";
+  document.getElementById("cancelBtn").innerText = "Cancelar";
+}
+
+function openViewModal(btn){
+  const permisos = (btn.dataset.permisos || "")
+      .split(",").filter(Boolean).map(n => Number(n));
+
+  showModal();
+  document.getElementById("modalTitle").innerText = "Detalle del Rol";
+  document.getElementById("rolForm").action = "#";
+  document.getElementById("methodField").value = "GET";
+  document.getElementById("modalMode").value = "view";
+
+  document.getElementById("nombre").value = btn.dataset.nombre || "";
+  document.getElementById("slug").value = btn.dataset.slug || "";
+  document.getElementById("descripcion").value = btn.dataset.descripcion || "";
+
+  setFormDisabled(true);
+  setPermsChecked(permisos); // 👈 muestra seleccionados
+  disablePerms(true);        // 👈 solo lectura
+
+  document.getElementById("submitBtn").style.display = "none";
+  document.getElementById("cancelBtn").innerText = "Cerrar";
+}

@@ -13,6 +13,16 @@
         <div class="alert alert-success">{{ session('success') }}
         </div>
         @endif
+        <div class="toolbar">
+        {{-- Buscador --}}
+        <form class="search" method="GET" action="{{ route('rols.index') }}">
+            <input type="text" name="q" value="{{ request('q') }}" placeholder="Buscar rol...">
+            <button type="submit">Buscar</button>
+        </form>
+
+        {{-- Botón de nuevo rol (abre modal) --}}
+        <button type="button" class="btn" onclick="openCreateModal()">+ Nuevo rol</button>
+        </div>
 
 
       {{-- Toolbar --}}
@@ -152,6 +162,7 @@ window.addEventListener('click', e=>{
                     data-nombre="{{ e($rol->nombre) }}"
                     data-slug="{{ e($rol->slug) }}"
                     data-descripcion="{{ e($rol->descripcion) }}"
+                    data-permisos="{{ $rol->permisos->pluck('id')->implode(',') }}"
                     onclick="openViewModal(this)"
                     >
                     Ver
@@ -165,6 +176,7 @@ window.addEventListener('click', e=>{
                     data-nombre="{{ e($rol->nombre) }}"
                     data-slug="{{ e($rol->slug) }}"
                     data-descripcion="{{ e($rol->descripcion) }}"
+                    data-permisos="{{ $rol->permisos->pluck('id')->implode(',') }}"
                     onclick="openEditModal(this)"
                     >
                     Editar
@@ -225,6 +237,15 @@ window.addEventListener('click', e=>{
         <label for="descripcion">Descripción</label>
         <textarea name="descripcion" id="descripcion" rows="3">{{ old('descripcion') }}</textarea>
 
+        <label>Permisos</label>
+            <div class="perm-list">
+            @foreach ($permisos as $perm)
+                <label class="perm-item">
+                <input type="checkbox" name="permisos[]" value="{{ $perm->id }}" class="perm-check">
+                <span>{{ $perm->nombre }}</span>
+                </label>
+            @endforeach
+            </div>
         {{-- Errores inline --}}
         @if ($errors->any())
           <div class="alert" style="background:#fee2e2;border-color:#fecaca;color:#7f1d1d">
