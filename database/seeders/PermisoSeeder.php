@@ -10,31 +10,54 @@ class PermisoSeeder extends Seeder
     public function run(): void
     {
         $permisos = [
-            // Usuarios y roles
-            ['nombre' => 'Ver Usuarios', 'slug' => 'usuarios.index'],
-            ['nombre' => 'Crear Usuario', 'slug' => 'usuarios.create'],
-            ['nombre' => 'Editar Usuario', 'slug' => 'usuarios.edit'],
-            ['nombre' => 'Eliminar Usuario', 'slug' => 'usuarios.destroy'],
 
-            // Ventas
-            ['nombre' => 'Ver Ventas', 'slug' => 'ventas.index'],
-            ['nombre' => 'Crear Venta', 'slug' => 'ventas.create'],
-            ['nombre' => 'Anular Venta', 'slug' => 'ventas.destroy'],
+            // USUARIOS
+            ['slug' => 'usuarios.ver',      'nombre' => 'Ver usuarios'],
+            ['slug' => 'usuarios.crear',    'nombre' => 'Crear usuario'],
+            ['slug' => 'usuarios.editar',   'nombre' => 'Editar usuario'],
+            ['slug' => 'usuarios.eliminar', 'nombre' => 'Eliminar usuario'],
 
-            // Compras
-            ['nombre' => 'Ver Compras', 'slug' => 'compras.index'],
-            ['nombre' => 'Registrar Compra', 'slug' => 'compras.create'],
+            // ROLES
+            ['slug' => 'rols.ver',      'nombre' => 'Ver roles'],
+            ['slug' => 'rols.crear',    'nombre' => 'Crear rol'],
+            ['slug' => 'rols.editar',   'nombre' => 'Editar rol'],
+            ['slug' => 'rols.eliminar', 'nombre' => 'Eliminar rol'],
 
-            // Inventario
-            ['nombre' => 'Ver Productos', 'slug' => 'productos.index'],
-            ['nombre' => 'Gestionar Stock', 'slug' => 'stock.manage'],
+            // PROVEEDORES
+            ['slug' => 'proveedores.ver',      'nombre' => 'Ver proveedores'],
+            ['slug' => 'proveedores.crear',    'nombre' => 'Crear proveedor'],
+            ['slug' => 'proveedores.editar',   'nombre' => 'Editar proveedor'],
+            ['slug' => 'proveedores.eliminar', 'nombre' => 'Eliminar proveedor'],
 
-            // Devoluciones
-            ['nombre' => 'Registrar Devolución', 'slug' => 'devoluciones.create'],
+            // PRODUCTOS / STOCK
+            ['slug' => 'productos.ver',     'nombre' => 'Ver productos'],
+            ['slug' => 'productos.crear',   'nombre' => 'Crear producto'],
+            ['slug' => 'productos.editar',  'nombre' => 'Editar producto'],
+            ['slug' => 'productos.eliminar','nombre' => 'Eliminar producto'],
+            ['slug' => 'productos.stock',   'nombre' => 'Gestionar stock / ajustes'],
+
+            // COMPRAS (ADMIN)
+            ['slug' => 'compras.ver',   'nombre' => 'Ver compras'],
+            ['slug' => 'compras.crear', 'nombre' => 'Registrar compra'],
+            ['slug' => 'compras.anular','nombre' => 'Anular compra'],
+
+            // VENTAS
+            ['slug' => 'ventas.ver',   'nombre' => 'Ver ventas'],
+            ['slug' => 'ventas.crear', 'nombre' => 'Registrar venta'],
+            ['slug' => 'ventas.anular','nombre' => 'Anular venta'],
+
+            // DEVOLUCIONES
+            ['slug' => 'devoluciones.registrar', 'nombre' => 'Registrar devolución'],
+
+            // REPORTES
+            ['slug' => 'reportes.ver', 'nombre' => 'Ver reportes'],
         ];
 
-        foreach ($permisos as $permiso) {
-            Permiso::create($permiso);
+        foreach ($permisos as $p) {
+            Permiso::updateOrCreate(
+                ['slug' => $p['slug']],
+                ['nombre' => $p['nombre']]
+            );
         }
     }
 }

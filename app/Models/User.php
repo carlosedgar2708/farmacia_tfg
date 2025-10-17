@@ -35,27 +35,34 @@ class User extends Authenticatable
     }
 
     // 👇 Agrega esta relación con roles
-    public function rols()
+    public function rols() // <- usamos "rols" como acordamos
     {
-        return $this->belongsToMany(Rol::class, 'rol_user', 'user_id', 'rol_id');
+        // pivote: rol_user (user_id, rol_id)
+        return $this->belongsToMany(\App\Models\Rol::class, 'rol_user', 'user_id', 'rol_id');
     }
-
     // Permisos a través de roles
     public function permisos()
     {
-        return $this->hasManyThrough(
-            Permiso::class,
-            Rol::class,
-            'id',          // clave local en Rol
-            'id',          // clave local en Permiso
-            'id',          // clave local en User
-            'rol_id'       // FK pivote rol_user
-        );
+    return \App\Models\Permiso::query()
+        ->whereIn('id', function ($q) {
+            $q->select('permiso_id')
+              ->from('permiso_rol')
+              ->whereIn('rol_id', $this->rols()->pluck('rols.id'));
+        })->get();
     }
-
+    public function esAdmin(): bool
+    {
+        // por nombre o slug según tu data
+        return $this->rols()
+            ->where('nombre', 'Administrador')
+            ->orWhere('slug', 'admin')
+            ->exists();
+    }
 
     public function tienePermiso(string $slug): bool
     {
-        return $this->rols()->whereHas('permisos', fn($q) => $q->where('slug', $slug))->exists();
+        return $this->rols()->whereHas('permisos', function ($q) use ($slug) {
+            $q->where('slug', $slug);
+        })->exists();
     }
 }

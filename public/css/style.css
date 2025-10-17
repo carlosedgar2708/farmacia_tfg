@@ -216,3 +216,44 @@ footer{ padding:28px 0; color:#6b7280; text-align:center }
   .modal-grid{ grid-template-columns:1fr }
   .perm-box{ max-height:260px }
 }
+/* ===== Auth (login/register) ===== */
+.auth-form{ max-width:480px }
+
+/* separación y alineación de campos */
+.auth-form .field{ margin-bottom:14px }
+.auth-form label{
+  display:block;
+  margin-bottom:6px;
+  color:#e7f4ff;            /* legible sobre panel azul */
+  font-weight:600;
+  letter-spacing:.2px;
+}
+.auth-form input[type="email"],
+.auth-form input[type="password"]{
+  width:100%;
+  height:44px;
+  padding:10px 12px;
+  border:1px solid #d1d5db;
+  border-radius:10px;
+  font:inherit;
+  background:#ffffff;
+  color:#0f172a;
+}
+
+/* remember */
+.auth-form .remember{
+  display:flex; align-items:center; gap:8px;
+  color:#e7f4ff; margin:8px 0 16px;
+}
+.auth-form .remember input{ transform:scale(1.05); }
+
+/* acciones */
+.auth-actions{
+  display:flex; flex-wrap:wrap; gap:12px;
+  align-items:center; justify-content:flex-start;
+}
+.auth-actions .btn{ margin-top:0 }          /* sin margen extra en el botón principal */
+.auth-actions .btn-outline{ margin-top:0 }  /* idem outline */
+
+/* título más compacto dentro del panel */
+.panel .h-top{ margin-bottom:10px }

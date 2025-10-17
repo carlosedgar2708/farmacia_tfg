@@ -6,13 +6,15 @@ use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
+// database/seeders/DatabaseSeeder.php
     public function run(): void
     {
         $this->call([
-            RolSeeder::class,
             PermisoSeeder::class,
+            RolSeeder::class,
             UserSeeder::class,
-            ProveedorSeeder::class,
+            // ProveedorSeeder::class, etc. si aplica
         ]);
     }
+
 }

@@ -14,11 +14,21 @@
   <header class="wrap header">
     <div class="logo">Farmacia TuMama :v</div>
     <nav class="nav">
-      <a href="{{ url('/') }}"></a>
-      <a href="{{ route('rols.index') }}">ROLES</a>
-      <a href="#">Compras</a>
-      <a href="#">Ventas</a>
+    <a href="{{ url('/') }}">HOME</a>
+    @auth
+        <a href="{{ route('rols.index') }}">Roles</a>
+        <a href="{{ route('users.index') }}">Usuarios</a>
+        <form action="{{ route('logout') }}" method="POST" style="display:inline">
+        @csrf
+        <button type="submit" class="btn-outline" style="margin-left:12px">Salir</button>
+        </form>
+    @else
+        <a href="{{ route('login') }}">Ingresar</a>
+        @if (Route::has('register'))
+        @endif
+    @endauth
     </nav>
+
   </header>
 
   <!-- Contenido variable -->
