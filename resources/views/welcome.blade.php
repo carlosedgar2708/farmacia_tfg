@@ -13,21 +13,25 @@
 </head>
 <body>
   <header class="wrap header">
-    <div class="logo">WEBSITE LOGO</div>
+    <div class="logo">FARMACIA KATY</div>
     <nav class="nav">
-      <a href="#">HOME</a><a href="#">NEWS</a><a href="#">PROJECT</a><a href="#">ABOUT US</a>
+
+      <a href="https://wa.me/59161531769" target="_blank" rel="noopener noreferrer">AYUDA</a>
     </nav>
   </header>
 
   <main class="wrap">
     <section class="grid">
       <div>
-        <h1><span class="h-top">PHARMACY</span><br><span class="h-sub">LANDING PAGE</span></h1>
+        <h1>
+          <span class="h-top">TU SALUD</span><br>
+          <span class="h-sub">NUESTRA MISIÓN</span>
+        </h1>
         <p>
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed diam nonummy nibh euismod tincidunt ut
-          laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation.
+         Control total, reportes automáticos y una experiencia diseñada para optimizar cada proceso.
         </p>
-        <a href="#" class="btn">LEARN MORE</a>
+        <!-- Redirige al login -->
+        <a href="{{ route('login') }}" class="btn">Iniciar Sesion</a>
       </div>
 
       <div class="hero">
@@ -38,9 +42,15 @@
             </div>
             <div class="shelf">
               <div class="rack">
-                <div class="row"><div class="p1"></div><div class="p2"></div><div class="p3"></div><div class="p2"></div></div>
-                <div class="row"><div class="p1"></div><div class="p4"></div><div class="p3"></div></div>
-                <div class="row"><div class="p4"></div><div class="p3"></div><div class="p5"></div></div>
+                <div class="row">
+                  <div class="p1"></div><div class="p2"></div><div class="p3"></div><div class="p2"></div>
+                </div>
+                <div class="row">
+                  <div class="p1"></div><div class="p4"></div><div class="p3"></div>
+                </div>
+                <div class="row">
+                  <div class="p4"></div><div class="p3"></div><div class="p5"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -49,14 +59,17 @@
         <div class="shadow"></div>
 
         <!-- bubbles -->
-        <span class="bubble b1"></span><span class="bubble b2"></span>
-        <span class="bubble b3"></span><span class="bubble b4"></span><span class="bubble b5"></span>
+        <span class="bubble b1"></span>
+        <span class="bubble b2"></span>
+        <span class="bubble b3"></span>
+        <span class="bubble b4"></span>
+        <span class="bubble b5"></span>
       </div>
     </section>
   </main>
 
   <footer>
-    © {{ date('Y') }} Pharmacy. All rights reserved.
+    © {{ date('Y') }} Farmacia Katy. All rights reserved.
   </footer>
 </body>
 </html>

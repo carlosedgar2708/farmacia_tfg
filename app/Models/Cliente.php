@@ -16,12 +16,8 @@ class Cliente extends Model
     // 🔹 Campos que se pueden llenar con create() o update()
     protected $fillable = [
         'nombre',
-        'apellido',
-        'dni',
-        'telefono',
-        'email',
-        'direccion',
-        'activo',
+        'documento',
+        'telefono'
     ];
 
     // 🔹 Conversión automática de tipos
@@ -36,7 +32,7 @@ class Cliente extends Model
      */
     public function ventas()
     {
-        return $this->hasMany(Venta::class, 'cliente_id');
+        return $this->hasMany(Venta::class);;
     }
 
     /**

@@ -6,8 +6,9 @@ use Illuminate\Http\Request;
 
 class AuthController extends Controller
 {
+
     public function welcome()
     {
-        return view('welcome');
+        return redirect()->intended(route('inicio'));
     }
 }

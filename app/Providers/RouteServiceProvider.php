@@ -13,7 +13,7 @@ class RouteServiceProvider extends ServiceProvider
     /**
      * Ruta a la que se redirige después de iniciar sesión.
      */
-    public const HOME = '/rols'; // 👈 Cambia esto si quieres que el login te lleve a otro lugar
+    public const HOME = '/inicio'; // 👈 Cambia esto si quieres que el login te lleve a otro lugar
 
     /**
      * Define tus rutas principales.
