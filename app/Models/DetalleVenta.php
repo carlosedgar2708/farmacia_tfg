@@ -20,14 +20,12 @@ class DetalleVenta extends Model
         'lote_id',          // lote del que se vendió
         'cantidad',
         'precio_unitario',
-        'iva',              // opcional, si tu tabla lo maneja
     ];
 
     // Casts
     protected $casts = [
         'cantidad'        => 'integer',
         'precio_unitario' => 'decimal:2',
-        'iva'             => 'decimal:2',
     ];
 
     /* ------------------ RELACIONES ------------------ */

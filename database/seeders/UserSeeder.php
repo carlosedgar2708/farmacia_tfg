@@ -21,9 +21,9 @@ class UserSeeder extends Seeder
                 ['email' => 'admin@farmacia.com'],
                 [
                     'username' => 'admin',        // <= OBLIGATORIO
-                    'name'     => 'Juan',
-                    'apellido' => 'Admin',
-                    'telefono' => null,
+                    'name'     => 'Cristiano',
+                    'apellido' => 'Ronaldo',
+                    'telefono' => '77777777',
                     'password' => Hash::make('admin123'),
                     'activo'   => true,
                 ]
@@ -38,8 +38,8 @@ class UserSeeder extends Seeder
                 [
                     'username' => 'vendedor',     // <= OBLIGATORIO
                     'name'     => 'Carla',
-                    'apellido' => 'Vendedora',
-                    'telefono' => null,
+                    'apellido' => 'Quiñones',
+                    'telefono' => '123456',
                     'password' => Hash::make('vendedor123'),
                     'activo'   => true,
                 ]

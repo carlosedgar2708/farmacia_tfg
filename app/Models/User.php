@@ -34,13 +34,11 @@ class User extends Authenticatable
         ];
     }
 
-    // 👇 Agrega esta relación con roles
-    public function rols() // <- usamos "rols" como acordamos
+    public function rols()
     {
-        // pivote: rol_user (user_id, rol_id)
         return $this->belongsToMany(\App\Models\Rol::class, 'rol_user', 'user_id', 'rol_id');
     }
-    // Permisos a través de roles
+
     public function permisos()
     {
     return \App\Models\Permiso::query()
@@ -52,7 +50,7 @@ class User extends Authenticatable
     }
     public function esAdmin(): bool
     {
-        // por nombre o slug según tu data
+
         return $this->rols()
             ->where('nombre', 'Administrador')
             ->orWhere('slug', 'admin')

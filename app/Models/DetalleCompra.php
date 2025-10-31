@@ -19,15 +19,13 @@ class DetalleCompra extends Model
         'producto_id',
         'lote_id',          // si tu detalle referencia el lote
         'cantidad',
-        'precio_unitario',
-        'iva',              // opcional, si está en tu tabla
+        'precio_unitario',            // opcional, si está en tu tabla
     ];
 
     // Conversión automática de tipos
     protected $casts = [
         'cantidad'        => 'integer',
         'precio_unitario' => 'decimal:2',
-        'iva'             => 'decimal:2',
     ];
 
     // ---------------------------------------------------------

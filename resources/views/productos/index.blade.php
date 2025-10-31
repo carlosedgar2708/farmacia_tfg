@@ -160,9 +160,7 @@
         <button type="button" class="btn-outline" id="btn-cancel-stock">Cancelar</button>
         <button type="submit" class="btn">Guardar cambios</button>
       </div>
-      <p style="opacity:.8;margin-top:8px;">
-        Nota: solo los usuarios con permiso <code>productos.stock</code> pueden guardar cambios.
-      </p>
+
     </form>
   </div>
 </div>

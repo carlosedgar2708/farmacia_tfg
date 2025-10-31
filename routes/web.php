@@ -12,7 +12,17 @@ use App\Http\Controllers\RolController;
 use App\Http\Controllers\PermisoController;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\LoteController;
+use App\Http\Controllers\VentaController;
 
+Route::middleware(['auth'])->group(function () {
+    Route::get('/ventas',            [VentaController::class, 'index'])->name('ventas.index');
+    Route::get('/ventas/create',     [VentaController::class, 'create'])->name('ventas.create');
+    Route::post('/ventas',           [VentaController::class, 'store'])->name('ventas.store');
+
+    // Aux (AJAX) – lotes con stock por producto
+    Route::get('/api/productos/{producto}/lotes', [VentaController::class, 'lotesPorProducto'])
+         ->name('api.productos.lotes');
+});
 
 /*
 |--------------------------------------------------------------------------

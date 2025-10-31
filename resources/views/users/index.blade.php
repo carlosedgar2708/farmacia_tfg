@@ -9,6 +9,9 @@
     @if (session('success'))
       <div class="alert alert-success">{{ session('success') }}</div>
     @endif
+    @if (session('error'))
+      <div class="alert alert-danger">{{ session('error') }}</div>
+    @endif
 
     <div class="toolbar">
       <form class="search" method="GET" action="{{ route('users.index') }}">
@@ -41,42 +44,47 @@
             @endforelse
           </td>
 
-            <td class="actions">
-                {{-- Ver --}}
-                    <button class="action view"
-                            onclick="openViewUser(this)"
-                            data-id="{{ $u->id }}"
-                            data-name="{{ e($u->name) }}"
-                            data-email="{{ e($u->email) }}"
-                            data-rols='@json($u->rols->pluck("nombre"))'
-                            data-rolids='@json($u->rols->pluck("id"))'>
-                    Ver
-                    </button>
+          <td class="actions">
+            {{-- Ver --}}
+            <button class="action view"
+                    onclick="openViewUser(this)"
+                    data-id="{{ $u->id }}"
+                    data-username="{{ e($u->username) }}"
+                    data-name="{{ e($u->name) }}"
+                    data-apellido="{{ e($u->apellido) }}"
+                    data-email="{{ e($u->email) }}"
+                    data-telefono="{{ e($u->telefono) }}"
+                    data-activo="{{ (int)$u->activo }}"
+                    data-rols='@json($u->rols->pluck("nombre"))'>
+              Ver
+            </button>
 
-                {{-- Editar --}}
-                @if(auth()->user()->tienePermiso('usuarios.editar'))
-                <button class="action edit"
-                        onclick="openEditUserModal(this)"
-                        data-id="{{ $u->id }}"
-                        data-name="{{ $u->name }}"
-                        data-email="{{ $u->email }}"
-                        data-roles="{{ $u->rols->pluck('id')->implode(',') }}">
-                    Editar
-                </button>
-                @endif
+            {{-- Editar --}}
+            @if(auth()->user()->tienePermiso('usuarios.editar'))
+            <button class="action edit"
+                    onclick="openEditUserModal(this)"
+                    data-id="{{ $u->id }}"
+                    data-username="{{ e($u->username) }}"
+                    data-name="{{ e($u->name) }}"
+                    data-apellido="{{ e($u->apellido) }}"
+                    data-email="{{ e($u->email) }}"
+                    data-telefono="{{ e($u->telefono) }}"
+                    data-activo="{{ (int)$u->activo }}"
+                    data-roles="{{ $u->rols->pluck('id')->implode(',') }}">
+              Editar
+            </button>
+            @endif
 
-                {{-- Eliminar --}}
-                @if(auth()->user()->tienePermiso('usuarios.eliminar') && auth()->id() !== $u->id)
-                <form action="{{ route('users.destroy', $u) }}" method="POST" style="display:inline"
-                    onsubmit="return confirm('¿Eliminar este usuario?');">
-                    @csrf
-                    @method('DELETE')
-                    <button class="action delete" type="submit">Eliminar</button>
-                </form>
-                @endif
-            </td>
-
-
+            {{-- Eliminar --}}
+            @if(auth()->user()->tienePermiso('usuarios.eliminar') && auth()->id() !== $u->id)
+            <form action="{{ route('users.destroy', $u) }}" method="POST" style="display:inline"
+                  onsubmit="return confirm('¿Eliminar este usuario?');">
+              @csrf
+              @method('DELETE')
+              <button class="action delete" type="submit">Eliminar</button>
+            </form>
+            @endif
+          </td>
         </tr>
       @empty
         <tr><td colspan="5" class="empty">Sin registros.</td></tr>
@@ -84,14 +92,14 @@
       </tbody>
     </table>
 
-    <div style="margin-top:10px">{{ $users->links() }}</div>
+    <div style="margin-top:10px">{{ $users->withQueryString()->links() }}</div>
   </div>
   <div class="shadow"></div>
 </section>
 @endsection
 
 @push('modals')
-<!-- Modal Usuarios -->
+{{-- Modal CREAR/EDITAR (mismo modal) --}}
 <div id="userModal" class="modal" aria-hidden="true">
   <div class="modal-content modal-wide">
     <button class="close" type="button" onclick="closeUserModal()">&times;</button>
@@ -99,43 +107,58 @@
 
     <form id="userForm" method="POST" action="{{ route('users.store') }}">
       @csrf
-      <input type="hidden" name="_method" id="userMethod" value="POST">
+      <input type="hidden" name="_method" id="f_method" value="POST">
 
       <div class="modal-grid">
         <div class="modal-col">
+          <label>Usuario</label>
+          <input type="text" name="username" id="f_username" placeholder="(se genera si lo dejas vacío)">
+
           <label>Nombre</label>
-          <input type="text" name="name" id="u_name" required>
+          <input type="text" name="name" id="f_name" required>
+
+          <label>Apellido</label>
+          <input type="text" name="apellido" id="f_apellido">
 
           <label>Email</label>
-          <input type="email" name="email" id="u_email" required>
+          <input type="email" name="email" id="f_email" required>
 
-          <label>Contraseña <small style="color:#64748b">(solo al crear o si deseas cambiar)</small></label>
-          <input type="password" name="password" id="u_password">
+          <label>Teléfono</label>
+          <input type="text" name="telefono" id="f_telefono">
+
+          <label>Contraseña <small style="color:#64748b">(obligatoria al crear / opcional al editar)</small></label>
+          <input type="password" name="password" id="f_password">
+
+          <label style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <input type="hidden" name="activo" value="0">
+            <input type="checkbox" name="activo" id="f_activo" value="1" checked>
+            Activo
+          </label>
         </div>
 
         <div class="modal-col">
-        <label>Roles</label>
-        <div class="perm-box">
+          <label>Roles</label>
+          <div class="perm-box">
             <div class="perm-list">
-            @foreach($rols as $role)
+              @foreach($rols as $role)
                 <label class="perm-item">
-                <input type="checkbox" class="role-check" name="roles[]" value="{{ $role->id }}">
-                <span>{{ $role->nombre }}</span>
+                  <input type="checkbox" class="role-check" name="roles[]" value="{{ $role->id }}">
+                  <span>{{ $role->nombre }}</span>
                 </label>
-            @endforeach
+              @endforeach
             </div>
-        </div>
+          </div>
 
-        <div class="modal-actions">
+          <div class="modal-actions">
             <button class="btn" id="userSubmit" type="submit">Guardar</button>
             <button class="btn btn-outline" type="button" onclick="closeUserModal()">Cancelar</button>
+          </div>
         </div>
-        </div>
-
       </div>
     </form>
   </div>
 </div>
+
 {{-- Modal VER --}}
 <div id="modalViewUser" class="modal">
   <div class="modal-content modal-wide">
@@ -144,10 +167,18 @@
 
     <div class="modal-grid">
       <div>
+        <label>Usuario</label>
+        <input id="v_username" type="text" readonly>
         <label>Nombre</label>
         <input id="v_name" type="text" readonly>
+        <label>Apellido</label>
+        <input id="v_apellido" type="text" readonly>
         <label>Email</label>
         <input id="v_email" type="text" readonly>
+        <label>Teléfono</label>
+        <input id="v_telefono" type="text" readonly>
+        <label>Activo</label>
+        <input id="v_activo" type="text" readonly>
       </div>
 
       <div>
@@ -160,63 +191,33 @@
     </div>
   </div>
 </div>
-
-{{-- Modal EDITAR --}}
-<div id="modalEditUser" class="modal">
-  <div class="modal-content modal-wide">
-    <button class="close" data-close>&times;</button>
-    <h2 class="modal-title">Editar usuario</h2>
-
-    <form id="formEditUser" method="POST">
-      @csrf
-      @method('PUT')
-
-      <div class="modal-grid">
-        <div>
-          <label>Nombre</label>
-          <input name="name" id="e_name" type="text" required>
-          <label>Email</label>
-          <input name="email" id="e_email" type="email" required>
-          <label>Nueva contraseña (opcional)</label>
-          <input name="password" id="e_password" type="password" placeholder="Deja vacío para no cambiar">
-        </div>
-
-        <div>
-          <label>Roles</label>
-          <div class="perm-list">
-            @foreach($rols as $r)
-              <label class="perm-item">
-                <input type="checkbox" name="roles[]" value="{{ $r->id }}">
-                <span>{{ $r->nombre }}</span>
-              </label>
-            @endforeach
-          </div>
-
-          <div class="modal-actions">
-            <button type="submit" class="btn">Guardar</button>
-            <button type="button" class="btn-outline" data-close>Cancelar</button>
-          </div>
-        </div>
-      </div>
-    </form>
-  </div>
-</div>
-
 @endpush
 
 @push('scripts')
 <script>
+function resetRoles() {
+  document.querySelectorAll('.role-check').forEach(c => c.checked = false);
+}
+
 function openCreateUserModal(){
   const m = document.getElementById('userModal');
   m.style.display = 'block';
   document.getElementById('userModalTitle').innerText = 'Nuevo usuario';
   document.getElementById('userForm').action = "{{ route('users.store') }}";
-  document.getElementById('userMethod').value = 'POST';
-  document.getElementById('u_name').value = '';
-  document.getElementById('u_email').value = '';
-  document.getElementById('u_password').value = '';
-  document.querySelectorAll('.role-check').forEach(c => c.checked = false);
+  document.getElementById('f_method').value = 'POST';
+
+  // reset
+  document.getElementById('f_username').value = '';
+  document.getElementById('f_name').value     = '';
+  document.getElementById('f_apellido').value = '';
+  document.getElementById('f_email').value    = '';
+  document.getElementById('f_telefono').value = '';
+  document.getElementById('f_password').value = '';
+  document.getElementById('f_activo').checked = true;
+  resetRoles();
+
   document.getElementById('userSubmit').innerText = 'Guardar';
+  document.getElementById('f_name').focus();
 }
 
 function openEditUserModal(btn){
@@ -227,10 +228,15 @@ function openEditUserModal(btn){
   m.style.display = 'block';
   document.getElementById('userModalTitle').innerText = 'Editar usuario';
   document.getElementById('userForm').action = '/users/' + id;
-  document.getElementById('userMethod').value = 'PUT';
-  document.getElementById('u_name').value = btn.dataset.name || '';
-  document.getElementById('u_email').value = btn.dataset.email || '';
-  document.getElementById('u_password').value = ''; // vacío (cambiar sólo si rellena)
+  document.getElementById('f_method').value = 'PUT';
+
+  document.getElementById('f_username').value = btn.dataset.username || '';
+  document.getElementById('f_name').value     = btn.dataset.name || '';
+  document.getElementById('f_apellido').value = btn.dataset.apellido || '';
+  document.getElementById('f_email').value    = btn.dataset.email || '';
+  document.getElementById('f_telefono').value = btn.dataset.telefono || '';
+  document.getElementById('f_password').value = '';
+  document.getElementById('f_activo').checked = (btn.dataset.activo === '1');
 
   const want = new Set(roles);
   document.querySelectorAll('.role-check').forEach(c => c.checked = want.has(Number(c.value)));
@@ -243,25 +249,29 @@ function closeUserModal(){
 }
 
 window.addEventListener('click', e => {
-  const m = document.getElementById('userModal');
-  if (e.target === m) closeUserModal();
+  const m1 = document.getElementById('userModal');
+  const m2 = document.getElementById('modalViewUser');
+  if (e.target === m1) closeUserModal();
+  if (e.target === m2) m2.style.display = 'none';
 });
-</script>
-<script>
+
 // ---- VER ----
 function openViewUser(btn){
   try {
-    const name   = btn.dataset.name || '';
-    const email  = btn.dataset.email || '';
-    const rols   = JSON.parse(btn.dataset.rols || '[]');     // nombres
     const modal  = document.getElementById('modalViewUser');
+    modal.style.display = 'block';
 
-    document.getElementById('v_name').value  = name;
-    document.getElementById('v_email').value = email;
+    document.getElementById('v_username').value = btn.dataset.username || '';
+    document.getElementById('v_name').value     = btn.dataset.name || '';
+    document.getElementById('v_apellido').value = btn.dataset.apellido || '';
+    document.getElementById('v_email').value    = btn.dataset.email || '';
+    document.getElementById('v_telefono').value = btn.dataset.telefono || '';
+    document.getElementById('v_activo').value   = (btn.dataset.activo === '1') ? 'Sí' : 'No';
 
     const cont = document.getElementById('v_roles');
     cont.innerHTML = '';
-    if (rols.length) {
+    const rols = JSON.parse(btn.dataset.rols || '[]');
+    if (rols.length){
       rols.forEach(n => {
         const s = document.createElement('span');
         s.className = 'badge';
@@ -275,36 +285,10 @@ function openViewUser(btn){
       cont.appendChild(s);
     }
 
-    modal.style.display = 'block';
     modal.querySelectorAll('[data-close]').forEach(x => x.onclick = () => modal.style.display = 'none');
-    modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
-  } catch (e) {
+  } catch(e){
     console.error('openViewUser error', e);
   }
 }
-
-// ---- EDITAR (tu modal combinado de crear/editar) ----
-function openEditUserModal(btn){
-  const id    = btn.dataset.id;
-  const name  = btn.dataset.name || '';
-  const email = btn.dataset.email || '';
-  const roles = (btn.dataset.roles || '').split(',').filter(Boolean).map(Number);
-
-  const m = document.getElementById('userModal');
-  m.style.display = 'block';
-
-  document.getElementById('userModalTitle').innerText = 'Editar usuario';
-  document.getElementById('userForm').action = '/users/' + id;
-  document.getElementById('userMethod').value = 'PUT';
-  document.getElementById('u_name').value = name;
-  document.getElementById('u_email').value = email;
-  document.getElementById('u_password').value = '';
-
-  const want = new Set(roles);
-  document.querySelectorAll('.role-check').forEach(c => c.checked = want.has(Number(c.value)));
-
-  document.getElementById('userSubmit').innerText = 'Actualizar';
-}
 </script>
-
 @endpush

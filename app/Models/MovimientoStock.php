@@ -16,16 +16,16 @@ class MovimientoStock extends Model
     // Campos que pueden llenarse masivamente
     protected $fillable = [
         'lote_id',
+        'fecha',
         'tipo',              // compra | venta | devolucion | ajuste
+        'motivo',
         'cantidad',          // positiva o negativa
-        'referencia_tipo',   // nombre del modelo origen (Compra, Venta, etc.)
-        'referencia_id',     // id del registro origen
-        'user_id',
-        'observacion',
+        'referencia',   // nombre del modelo origen (Compra, Venta, etc.
     ];
 
     // Conversión de tipos
     protected $casts = [
+        'fecha'=> 'datetime',
         'cantidad' => 'integer',
     ];
 
