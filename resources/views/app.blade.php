@@ -147,8 +147,8 @@
           @auth
             <img class="avatar" src="https://ui-avatars.com/api/?name={{ urlencode(auth()->user()->name ?? 'U') }}&background=357c90&color=fff" alt="avatar">
             <div class="u-info">
-              <strong>{{ auth()->user()->name ?? 'Usuario' }}</strong>
-              <small>En línea</small>
+              <strong>{{ auth()->user()->name ?? 'Usuario'}}</strong><br>
+              <small> En línea</small>
             </div>
             <form action="{{ route('logout') }}" method="POST">
               @csrf

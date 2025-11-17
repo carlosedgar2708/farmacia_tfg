@@ -60,17 +60,19 @@ class VentaController extends Controller
             'observacion'          => ['nullable','string','max:500'],
             'items'                => ['required','array','min:1'],
             'items.*.producto_id'  => ['required','integer', Rule::exists('productos','id')],
-            'items.*.lote_id'      => ['required','integer', Rule::exists('lotes','id')],
+            // OJO: ya no pedimos lote_id aquí
+            // 'items.*.lote_id'   => ['required','integer', Rule::exists('lotes','id')],
             'items.*.cantidad'     => ['required','integer','min:1'],
             'items.*.precio'       => ['required','numeric','min:0'],
         ],[
             'items.required' => 'Agrega al menos un renglón de venta.',
         ]);
 
+
         DB::transaction(function () use ($data) {
             // Cabecera
             $venta = Venta::create([
-                'cliente_id'  => $data['cliente_id'] ?? null,   // opcional
+                'cliente_id'  => $data['cliente_id'] ?? null,
                 'user_id'     => auth()->id(),
                 'fecha_venta' => Carbon::now(),
                 'observacion' => $data['observacion'] ?? null,
@@ -80,42 +82,69 @@ class VentaController extends Controller
             $total = 0;
 
             foreach ($data['items'] as $it) {
-                // Bloquea fila del lote para evitar carreras
-                $lote = Lote::lockForUpdate()->findOrFail($it['lote_id']);
+                $productoId = (int) $it['producto_id'];
+                $cantidadSolicitada = (int) $it['cantidad'];
+                $precioUnitario = (float) $it['precio'];
 
-                // Coherencia: que el lote pertenezca al producto elegido
-                if ((int)$lote->producto_id !== (int)$it['producto_id']) {
-                    abort(422, 'El lote no pertenece al producto seleccionado.');
+                // Traer TODOS los lotes del producto con stock > 0
+                // ordenados por fecha de vencimiento (primero los que vencen antes)
+                $lotes = Lote::where('producto_id', $productoId)
+                    ->where('stock', '>', 0)
+                    ->orderByRaw('fecha_vencimiento IS NULL, fecha_vencimiento ASC') // los NULL al final
+                    ->lockForUpdate() // bloqueamos para evitar carreras
+                    ->get();
+
+                // Verificar stock total suficiente
+                $stockTotal = $lotes->sum('stock');
+                if ($stockTotal < $cantidadSolicitada) {
+                    abort(422, "Stock insuficiente para el producto ID {$productoId}. Disponible total: {$stockTotal}");
                 }
 
-                // Stock suficiente
-                if ((int)$lote->stock < (int)$it['cantidad']) {
-                    abort(422, "Stock insuficiente en el lote #{$lote->id} ({$lote->stock} disp.).");
+                $cantidadRestante = $cantidadSolicitada;
+
+                foreach ($lotes as $lote) {
+                    if ($cantidadRestante <= 0) {
+                        break;
+                    }
+
+                    $disponibleEnLote = (int) $lote->stock;
+                    if ($disponibleEnLote <= 0) {
+                        continue;
+                    }
+
+                    // Cuánto tomamos de este lote
+                    $tomar = min($cantidadRestante, $disponibleEnLote);
+
+                    // Creamos detalle de venta para ESTE lote
+                    DetalleVenta::create([
+                        'venta_id'        => $venta->id,
+                        'producto_id'     => $productoId,
+                        'lote_id'         => $lote->id,
+                        'cantidad'        => $tomar,
+                        'precio_unitario' => $precioUnitario, // mismo precio para todos los lotes del mismo producto
+                    ]);
+
+                    // Descontamos stock
+                    $lote->decrement('stock', $tomar);
+
+                    // Movimiento de stock
+                    MovimientoStock::create([
+                        'lote_id'    => $lote->id,
+                        'fecha'      => Carbon::now(),
+                        'tipo'       => 'Salida',
+                        'motivo'     => 'Venta',
+                        'cantidad'   => $tomar,
+                        'referencia' => 'Venta #'.$venta->id,
+                    ]);
+
+                    $total += $tomar * $precioUnitario;
+                    $cantidadRestante -= $tomar;
                 }
 
-                // Crea detalle (sin producto_id porque tu tabla no lo tiene)
-                DetalleVenta::create([
-                    'venta_id'        => $venta->id,
-                    'producto_id'     => $it['producto_id'],
-                    'lote_id'         => $it['lote_id'],
-                    'cantidad'        => (int)$it['cantidad'],
-                    'precio_unitario' => (float)$it['precio'],
-                ]);
-
-                // Descontar stock
-                $lote->decrement('stock', (int)$it['cantidad']);
-
-                // Movimiento de stock
-                MovimientoStock::create([
-                    'lote_id'         => $lote->id,
-                    'fecha'           => Carbon::now(),
-                    'tipo'            => 'Salida',
-                    'motivo'          => 'Venta',
-                    'cantidad'        => (int)$it['cantidad'],
-                    'referencia'      => 'Venta #'.$venta->id,
-                ]);
-
-                $total += ((int)$it['cantidad']) * ((float)$it['precio']);
+                // Por seguridad, si al final queda algo (no debería pasar por el check de arriba)
+                if ($cantidadRestante > 0) {
+                    abort(422, "Ocurrió un problema al descontar stock por lotes. Faltan {$cantidadRestante} unidades.");
+                }
             }
 
             // Si manejas recibo asociado
@@ -129,4 +158,5 @@ class VentaController extends Controller
 
         return redirect()->route('ventas.index')->with('success','Venta registrada correctamente.');
     }
+
 }
