@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string(('nombre'));
             $table->boolean('es_inyectable')->default(false);
             $table->text('description')->nullable();
+            $table->decimal('precio_venta', 10, 2)->default(0);
             $table->timestamps();
             $table->softDeletes();
         });

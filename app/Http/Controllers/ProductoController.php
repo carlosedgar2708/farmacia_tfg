@@ -34,22 +34,27 @@ class ProductoController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'codigo'        => ['required', 'string', 'max:50',
-                Rule::unique('productos', 'codigo')->where(fn($q) => $q->whereNull('deleted_at'))
+            'codigo'        => ['required','string','max:50',
+                Rule::unique('productos','codigo')->where(fn($q)=>$q->whereNull('deleted_at'))
             ],
-            'nombre'        => ['required', 'string', 'max:255'],
-            'es_inyectable' => ['sometimes', 'boolean'], // checkbox
-            'description'   => ['nullable', 'string'],
+            'nombre'        => ['required','string','max:255'],
+            'precio_venta'  => ['required','numeric','min:0'],
+            'es_inyectable' => ['sometimes','boolean'],
+            'description'   => ['nullable','string'],
         ]);
 
-        // Si no viene el checkbox, queda false
-        $data['es_inyectable'] = (bool) ($data['es_inyectable'] ?? false);
+        $data['es_inyectable'] = (bool)($data['es_inyectable'] ?? false);
 
-        Producto::create($data);
+        $producto = Producto::create($data);
+
+        if ($request->expectsJson()) {
+            return response()->json($producto);
+        }
 
         return redirect()->route('productos.index')
-            ->with('success', 'Producto creado correctamente.');
+            ->with('success','Producto creado correctamente.');
     }
+
 
     public function update(Request $request, Producto $producto)
     {

@@ -13,6 +13,8 @@ use App\Http\Controllers\PermisoController;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\LoteController;
 use App\Http\Controllers\VentaController;
+use App\Http\Controllers\CompraController;
+
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/ventas',            [VentaController::class, 'index'])->name('ventas.index');
@@ -37,8 +39,12 @@ Route::get('/', [AuthController::class, 'welcome'])->name('welcome');
 | RUTAS PROTEGIDAS (auth)
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth')->group(function () {
+Route::get('/', [InicioController::class, 'index'])
+    ->name('inicio')
+    ->middleware('auth');
 
+Route::middleware('auth')->group(function () {
+Route::resource('lotes', LoteController::class);
     // === DASHBOARD ===
     Route::get('/inicio', [InicioController::class, 'index'])->name('inicio');
 
@@ -69,6 +75,20 @@ Route::middleware('auth')->group(function () {
             Route::middleware('permiso:productos.stock')->put('/{lote}', [LoteController::class, 'update'])->name('update');
             Route::middleware('permiso:productos.stock')->delete('/{lote}', [LoteController::class, 'destroy'])->name('destroy');
         });
+    });
+    Route::middleware(['auth'])->group(function () {
+
+        Route::get('/compras',  [CompraController::class, 'index'])
+            ->name('compras.index')
+            ->middleware('permiso:compras.ver');
+
+        Route::get('/compras/create', [CompraController::class, 'create'])
+            ->name('compras.create')
+            ->middleware('permiso:compras.crear');
+
+        Route::post('/compras', [CompraController::class, 'store'])
+            ->name('compras.store')
+            ->middleware('permiso:compras.crear');
     });
 
 

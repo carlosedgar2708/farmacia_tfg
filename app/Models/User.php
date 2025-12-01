@@ -36,9 +36,13 @@ class User extends Authenticatable
 
     public function rols()
     {
-        return $this->belongsToMany(\App\Models\Rol::class, 'rol_user', 'user_id', 'rol_id');
+        return $this->belongsToMany(\App\Models\Rol::class, 'rol_user', 'user_id', 'rol_id') ->withTimestamps();
     }
 
+    public function hasRol($nombre)
+    {
+        return $this->rols()->where('nombre', $nombre)->exists();
+    }
     public function permisos()
     {
     return \App\Models\Permiso::query()
@@ -56,6 +60,7 @@ class User extends Authenticatable
             ->orWhere('slug', 'admin')
             ->exists();
     }
+
 
     public function tienePermiso(string $slug): bool
     {

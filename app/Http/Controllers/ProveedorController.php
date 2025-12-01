@@ -11,19 +11,21 @@ class ProveedorController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'nombre'   => [
-                'required','string','max:255',
-                Rule::unique('proveedors', 'nombre')
-                    ->where(fn($q) => $q->whereNull('deleted_at')),
-            ],
+            'nombre'   => ['required','string','max:255'],
             'contacto' => ['nullable','string','max:255'],
-            'telefono' => ['nullable','string','max:255'],
+            'telefono' => ['nullable','string','max:30'],
         ]);
 
-        Proveedor::create($data);
+        $proveedor = Proveedor::create($data);
 
-        return redirect()->route('proveedors.index')->with('success','Proveedor creado correctamente.');
+        if ($request->expectsJson()) {
+            return response()->json($proveedor);
+        }
+
+        return redirect()->route('proveedors.index')
+            ->with('success','Proveedor creado.');
     }
+
 
     public function update(Request $request, Proveedor $proveedor)
     {

@@ -174,7 +174,12 @@
 
       {{-- flashes --}}
       <div class="flash">
-        @if (session('success')) <div class="alert alert-success">{{ session('success') }}</div> @endif
+        @once
+        @if(session('success'))
+            <div class="alert alert-success">{{ session('success') }}</div>
+        @endif
+        @endonce
+
         @if (session('error'))   <div class="alert alert-danger">{{ session('error') }}</div>   @endif
         @if ($errors->any())
           <div class="alert alert-danger">

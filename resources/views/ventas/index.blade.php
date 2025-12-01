@@ -13,9 +13,6 @@
       </a>
     </div>
 
-    @if(session('success'))
-      <div class="alert alert-success">{{ session('success') }}</div>
-    @endif
 
     <div class="table-wrap">
       <table class="table table-soft">

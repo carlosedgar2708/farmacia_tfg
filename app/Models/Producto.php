@@ -16,6 +16,7 @@ class Producto extends Model
         'nombre',
         'es_inyectable',
         'description',
+        'precio_venta',
     ];
 
     protected $casts = [

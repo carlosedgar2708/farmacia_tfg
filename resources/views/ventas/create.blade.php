@@ -18,8 +18,18 @@
       <div class="top-controls grid4">
         <div class="ctrl"><label>Cantidad</label><input id="ctrl_cantidad" type="number" min="1" step="1" value="1"></div>
         <div class="ctrl"><label>Stock</label><input id="ctrl_stock" type="number" value="0" readonly></div>
-        <div class="ctrl"><label>P. venta</label><input id="ctrl_precio" type="number" step="0.01" value="0.00"></div>
-        <div class="ctrl"><label>Descuento</label><input id="ctrl_desc" type="number" step="0.01" value="0.00"></div>
+        <div class="ctrl"><label>P. venta</label><input id="ctrl_precio" type="number" step="0.01" value="0.00"readonly></div>
+
+        @php $esAdmin = auth()->user()->esAdmin(); @endphp
+
+        {{-- para que solo el admin pueda editar el descuento --}}
+        @if($esAdmin)
+        <div class="ctrl"> <label>Descuento</label><input id="ctrl_desc" type="number" step="0.01" value="0.00" min="0"></div>
+        @else
+
+    {{-- empleado NO lo ve --}}
+    <input id="ctrl_desc" type="hidden" value="0.00">
+    @endif
         <div class="ctrl full">
           <button id="btnAgregar" class="btn add"><i class="ri-add-circle-line"></i> Agregar</button>
         </div>
@@ -204,9 +214,7 @@ function stockTotalProducto(producto) {
   return (producto?.lotes || []).reduce((sum, l) => sum + (l.stock || 0), 0);
 }
 function precioSugeridoProducto(producto) {
-  const lotes = producto?.lotes || [];
-  const conStock = lotes.find(l => (l.stock || 0) > 0) || lotes[0];
-  return Number(conStock?.precio || 0);
+  return Number(producto?.precio_venta || 0);
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -332,20 +340,36 @@ function agregarFila(){
 
   const idx = $tbody.children.length+1;
   const sub = Math.max(0,cant*precio - desc);
+  const ES_ADMIN = @json($esAdmin);
 
-  tr.innerHTML=`
-    <td>${idx}</td>
-    <td>
-      <div style="display:flex;flex-direction:column">
-        <strong>${productoSel.nombre}</strong>
-      </div>
-    </td>
-    <td><input class="in qty" type="number" min="1" step="1" value="${cant}"></td>
-    <td><input class="in price" type="number" min="0" step="0.01" value="${money(precio)}"></td>
-    <td><input class="in disc"  type="number" min="0" step="0.01" value="${money(desc)}"></td>
-    <td class="sub">Bs ${money(sub)}</td>
-    <td><button type="button" class="btn btn-outline del"><i class="ri-delete-bin-6-line"></i></button></td>
-  `;
+tr.innerHTML = `
+  <td>${idx}</td>
+  <td>
+    <div style="display:flex;flex-direction:column">
+      <strong>${productoSel.nombre}</strong>
+    </div>
+  </td>
+
+  <td><input class="in qty" type="number" min="1" step="1" value="${cant}"></td>
+
+  <td><input class="in price" type="number" min="0" step="0.01" value="${money(precio)}" readonly></td>
+
+  <td>
+      <input class="in disc" type="number" min="0" step="0.01"
+             value="${money(desc)}"
+             ${ES_ADMIN ? '' : 'readonly'}
+      >
+  </td>
+
+  <td class="sub">Bs ${money(sub)}</td>
+
+  <td>
+    <button type="button" class="btn btn-outline del">
+      <i class="ri-delete-bin-6-line"></i>
+    </button>
+  </td>
+`;
+
   $tbody.appendChild(tr);
 
   recalcTotal();

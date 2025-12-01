@@ -17,6 +17,7 @@ return new class extends Migration
         $table->foreignId('proveedor_id')->constrained('proveedors');
         $table->foreignId('user_id')->constrained('users'); // quién registró la compra
         $table->timestamps();
+        $table->softDeletes();
         });
     }
 
