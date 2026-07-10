@@ -132,7 +132,7 @@ Route::middleware('auth')->group(function () {
 | PERMISOS (público o interno)
 |--------------------------------------------------------------------------
 */
-Route::prefix('permiso')->group(function () {
+Route::middleware('auth')->prefix('permiso')->group(function () {
     Route::get('/', [PermisoController::class, 'index'])->name('mostrar.permiso');
     Route::post('/', [PermisoController::class, 'store'])->name('crear.permiso');
     Route::patch('/', [PermisoController::class, 'update'])->name('editar.permiso');

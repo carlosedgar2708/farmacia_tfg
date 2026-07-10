@@ -180,3 +180,79 @@ Las 5 pruebas pasaron en el primer intento; no fue necesario corregir código. S
 Widget "Próximos a vencer" validado funcionalmente y con cobertura de regresión permanente. `docs/pendientes.md` actualizado para reflejar la verificación automatizada.
 
 ---
+
+## 2026-07-10 (continuación) — Sprint 3: rutas `/permiso` y mismatch de slugs `proveedores`/`proveedors`
+
+Se ejecutó el Sprint 2 documentado en `docs/pendientes.md` ("Errores críticos de seguridad": C-04 y C-05), retomando el plan sin volver a auditar el proyecto completo.
+
+### Revisión previa
+
+Se releyeron únicamente los archivos involucrados: `routes/web.php`, `database/seeders/PermisoSeeder.php` y `app/Http/Middleware/PermisoMiddleware.php`. Se confirmó el estado exacto descrito en `pendientes.md`: el grupo `/permiso` sin `middleware('auth')`, y `PermisoSeeder` sembrando `proveedores.*` mientras las rutas verifican `proveedors.*`.
+
+Antes de tocar código se inspeccionó la base de datos real (`farmacia_tfg`) y se detectó que el rol no-admin **"Supervisor 1"** (id 3) ya tenía `proveedores.crear` y `proveedores.editar` asignados en `permiso_rol` — confirmando que un simple cambio de string en el seeder (que dispara `updateOrCreate` por slug) habría creado permisos duplicados con IDs nuevos y roto esa asignación existente en silencio.
+
+### C-04 — Rutas `/permiso` sin auth
+
+Se envolvió el grupo `Route::prefix('permiso')` en `Route::middleware('auth')->prefix('permiso')->group(...)` (`routes/web.php`).
+
+### C-05 — Mismatch de slugs de proveedores
+
+Se agregó a `PermisoSeeder::run()` un paso previo que renombra en sitio los 4 slugs `proveedores.*` → `proveedors.*` (`Permiso::where('slug', $antiguo)->update(['slug' => $nuevo])`), preservando los IDs, y luego se actualizó el array de siembra para usar ya los slugs correctos (necesario para instalaciones nuevas). Se ejecutó `php artisan db:seed --class=PermisoSeeder` contra la base real.
+
+### Verificación
+
+- `route:list --path=permiso`: las 4 rutas muestran `auth` en su pila de middleware.
+- Petición real sin sesión a `/permiso` a través del kernel HTTP → `302` hacia `/login` (antes habría ejecutado el controlador vacío con `200`).
+- Los 4 permisos de proveedores conservan sus IDs originales (9-12) con el slug ya corregido; no se crearon filas duplicadas (conteo de `Permiso` antes/después sin cambios en cantidad, solo en slug).
+- `permiso_rol` intacto: mismas 6 filas para esos IDs (mismos `id`, `rol_id`, `permiso_id`), incluida la asignación del rol "Supervisor 1".
+- `tienePermiso()` simulado con un usuario temporal en rol "Supervisor 1" (creado y revertido dentro de una transacción, sin residuos): `proveedors.crear`/`proveedors.editar` → `true`; `proveedors.ver` (no asignado) → `false`; el slug viejo `proveedores.crear` → `false` (ya no existe).
+
+### Hallazgo colateral (fuera de alcance, no corregido)
+
+Durante la verificación con un usuario sin roles se detectó que `User::esAdmin()` devuelve `true` para **cualquier** usuario del sistema, por un `orWhere('slug','admin')` sin agrupar que escapa el filtro `user_id` del pivote `rol_user` (precedencia `AND`/`OR` de SQL). Efecto: hoy `PermisoMiddleware` deja pasar a todos los usuarios sin importar sus permisos reales, para cualquier ruta protegida con `permiso:*`. No se corrigió por estar fuera del alcance del Sprint 3. Documentado en `docs/pendientes.md` bajo C-05, pendiente de que el usuario decida si se cataloga como nuevo bug y su prioridad.
+
+### Documentación actualizada
+
+`docs/pendientes.md`: BUG-07 marcado como corregido, Sprint 2 (C-04/C-05) marcado como completado con el detalle de la corrección y el hallazgo colateral.
+
+### Estado al cierre
+
+Sprint 3 (según la numeración de esta sesión con el usuario) completado: rutas `/permiso` protegidas y mismatch de slugs de proveedores corregido sin romper `permiso_rol`. Pendiente fuera de este sprint: bug de `esAdmin()` recién descubierto, y el Sprint 3 documentado internamente en `pendientes.md` (decisión sobre `SoftDeletes` en `MovimientoStock`), que conserva su propia numeración histórica y no se tocó.
+
+---
+
+## 2026-07-10 (continuación) — Corrección de `User::esAdmin()` (BUG-08)
+
+Se retomó el hallazgo colateral detectado en la entrada anterior. El usuario pidió primero un análisis sin código, y solo tras su aprobación se aplicó la corrección.
+
+### Análisis previo (sin código)
+
+Se revisó exclusivamente `User::esAdmin()` y los métodos relacionados del mismo modelo (`hasRol()`, `tienePermiso()`, `permisos()`), sin volver a auditar el resto del proyecto. Con `toSql()` se confirmó la causa exacta: `$this->rols()` ya agrega `WHERE rol_user.user_id = ?` a la consulta de la relación; el `->where('nombre','Administrador')->orWhere('slug','admin')` posterior, al no estar agrupado, produce `(user_id = ? AND nombre = 'Administrador') OR slug = 'admin'` por precedencia SQL — el segundo término no depende del usuario que llama al método y, como el `JOIN` con `rol_user` no está filtrado por usuario, basta con que **cualquier** usuario del sistema tenga el rol admin asignado para que `esAdmin()` devuelva `true` para todos.
+
+Se hizo un barrido de todos los call-sites de `esAdmin()` en el código (no solo `PermisoMiddleware`): `ConfiguracionController` (`/configuracion`), `VentaController` (flag de descuento), `app.blade.php` (enlace de sidebar) y `ventas/create.blade.php` (input de descuento + variable JS). Se confirmó con datos reales de la BD (`admin`, `vendedor`, `Xhaka`) y con un usuario temporal sin roles (transacción revertida) que el bug afecta a todos por igual. `hasRol()`, `tienePermiso()` y `permisos()` se revisaron y no comparten el patrón (no tienen `orWhere` sin agrupar).
+
+El usuario aprobó el plan con alcance estricto: modificar únicamente `app/Models/User.php`, sin tocar middleware, controladores, seeders, migraciones, rutas ni vistas, y sin corregir en este sprint el hueco de datos que quedara expuesto (rol "Supervisor 1").
+
+### Corrección aplicada
+
+Único cambio en `app/Models/User.php`, método `esAdmin()`: se agrupó la condición dentro de un closure (`->where(fn($q) => $q->where(...)->orWhere(...))`) para que quede ANDada con el filtro de usuario del pivote, en vez de escaparlo.
+
+### Verificación
+
+Contra la base de datos real, sin mutar datos permanentes (usuarios temporales creados dentro de transacciones revertidas):
+- `esAdmin()`: `admin` → `true`; `vendedor` y `Xhaka` → `false` (antes `true`); usuario sin roles → `false`.
+- `PermisoMiddleware` simulado con los usuarios reales: vendedor bloqueado en `clientes.ver`/`proveedors.ver`, permitido en `productos.ver`/`ventas.crear`; admin con bypass total intacto.
+- `ConfiguracionController::edit()`: vendedor → `403`; admin → renderiza la vista.
+- Flag `esAdmin` devuelto por `VentaController::create()` (controla el campo de descuento): `false` para vendedor, `true` para admin.
+- Suite completa (`php artisan test`): mismo resultado que antes del fix (6 passed, 1 fallo preexistente y no relacionado en `ExampleTest`). Sin regresiones.
+- Se confirmó también, tal como se anticipó en el análisis, que el rol "Supervisor 1" queda con un hueco de datos visible (`proveedors.crear`/`editar` sin `proveedors.ver`/`eliminar`) — no se corrigió, según instrucción explícita del usuario.
+
+### Documentación actualizada
+
+`docs/pendientes.md`: nuevo `BUG-08` en el catálogo de bugs (corregido), la nota de "hallazgo no relacionado" bajo C-05 actualizada para apuntar a `BUG-08` ya resuelto, nueva sección "Problemas de Datos" con `DATA-01` (hueco de permisos del rol "Supervisor 1", sin corregir), y tabla de priorización actualizada.
+
+### Estado al cierre
+
+RBAC del sistema restaurado: `PermisoMiddleware`, `/configuracion` y el descuento de ventas vuelven a respetar los permisos reales de cada rol. Pendiente, fuera de alcance: `DATA-01` (hueco de datos del rol "Supervisor 1") y el Sprint 3 histórico de `pendientes.md` (decisión sobre `SoftDeletes` en `MovimientoStock`).
+
+---

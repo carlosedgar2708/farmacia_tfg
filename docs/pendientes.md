@@ -106,16 +106,66 @@ El modelo define `scopeSalidas()` filtrando `cantidad < 0`, pero los movimientos
 
 ---
 
-### BUG-07 — Rutas de permisos sin protección de autenticación
+### BUG-07 — Rutas de permisos sin protección de autenticación ✅ CORREGIDO (2026-07-10)
 
 **Módulo:** Permisos
 **Archivo:** `routes/web.php`
 
-Las rutas bajo el prefijo `/permiso` están registradas fuera del grupo `middleware('auth')`. Cualquier petición HTTP sin sesión activa puede acceder a ellas.
+Las rutas bajo el prefijo `/permiso` estaban registradas fuera del grupo `middleware('auth')`. Cualquier petición HTTP sin sesión activa podía acceder a ellas.
 
 **Efecto:** Aunque los métodos del controlador están vacíos actualmente, si se implementan, cualquier usuario no autenticado podría manipular los permisos del sistema.
 
-**Corrección requerida:** Mover el grupo de rutas `/permiso` dentro del grupo `middleware('auth')`.
+**Corregido:** se envolvió el grupo `Route::prefix('permiso')` en `Route::middleware('auth')->prefix('permiso')->group(...)`. Verificado con `route:list` (las 4 rutas muestran `auth` en su pila de middleware) y con una petición real sin sesión a través del kernel HTTP, que ahora responde `302` hacia `/login` en lugar de ejecutar el controlador.
+
+---
+
+### BUG-08 — `User::esAdmin()` devolvía `true` para cualquier usuario ✅ CORREGIDO (2026-07-10)
+
+**Módulo:** Autenticación / RBAC
+**Archivo:** `app/Models/User.php`
+
+Detectado durante la verificación de BUG-04 (mismatch de slugs de proveedores). `esAdmin()` estaba escrito como:
+
+```php
+$this->rols()->where('nombre', 'Administrador')->orWhere('slug', 'admin')->exists();
+```
+
+`$this->rols()` ya agrega `WHERE rol_user.user_id = ?` como parte de la consulta de la relación (no como parte del `JOIN ON`). Por precedencia SQL (`AND` liga más fuerte que `OR`), la condición final quedaba agrupada como `(rol_user.user_id = ? AND nombre = 'Administrador') OR slug = 'admin'`. El segundo término no hereda el filtro de usuario, y como el `JOIN` con `rol_user` no está filtrado por usuario, ese `OR` pasa a preguntar "¿existe en toda la tabla `rol_user`, para cualquier usuario, algún rol con `slug = 'admin'`?" — algo que nada tiene que ver con el usuario que llama al método.
+
+**Efecto:** en cualquier instalación con al menos un usuario administrador seedeado (que es el caso normal), `esAdmin()` devolvía `true` para **todos** los usuarios del sistema, incluso uno recién creado sin ningún rol asignado (verificado). Esto anulaba de facto el RBAC completo:
+- `PermisoMiddleware` dejaba pasar a cualquier usuario autenticado en todas las rutas protegidas con `permiso:*` (productos, lotes/stock, usuarios, clientes, proveedores, compras), sin importar sus permisos reales.
+- `ConfiguracionController::edit()`/`update()` (`/configuracion`) eran accesibles para cualquier usuario, no solo administradores.
+- El campo de descuento en `VentaController::create()`/`store()` y en la vista `ventas/create.blade.php` se habilitaba para cualquier vendedor, aunque está documentado como exclusivo de administradores.
+- El enlace "Configuración" del sidebar (`app.blade.php`) se mostraba a todos los usuarios.
+
+**Corregido:** se agrupó la condición dentro de un closure para que quede ANDada correctamente con el filtro de usuario:
+
+```php
+$this->rols()->where(function ($q) {
+    $q->where('nombre', 'Administrador')->orWhere('slug', 'admin');
+})->exists();
+```
+
+Único archivo modificado: `app/Models/User.php`. No se tocaron `PermisoMiddleware`, controladores, seeders, migraciones, rutas ni vistas.
+
+**Verificado** contra la base de datos real: `esAdmin()` correcto para `admin@farmacia.com` (`true`), `vendedor@farmacia.com` y `Xhaka` (`false` ambos, antes `true`), y para un usuario sin roles (`false`). `PermisoMiddleware` simulado con estos usuarios reales respeta ahora sus permisos reales (vendedor bloqueado en `clientes.ver`/`proveedors.ver`, permitido en `productos.ver`/`ventas.crear`; admin sigue con bypass total). `/configuracion` bloqueado para vendedor, permitido para admin. Flag `esAdmin` en `ventas.create` correcto (`false` para vendedor, `true` para admin). Suite de tests: mismo resultado que antes del fix (sin regresiones nuevas).
+
+**Efecto secundario esperado (no es un bug):** ahora que el RBAC real está activo, `vendedor@farmacia.com` y `Xhaka` (rol Vendedor, con permisos reales limitados a `ventas.ver`, `ventas.crear`, `productos.ver`, `devoluciones.registrar`) pierden el acceso de facto que tenían antes a `usuarios`, `clientes`, `proveedores`, `compras`, edición/eliminación de productos, gestión de stock y `/configuracion`, y ya no pueden aplicar descuentos en ventas. Es el comportamiento correcto, pero visible de inmediato si se prueba con esas cuentas.
+
+**Problema de datos detectado (no corregido, fuera de alcance):** ver `DATA-01` más abajo — el rol "Supervisor 1" quedó con una asignación de permisos incompleta que este fix hizo visible.
+
+---
+
+## Problemas de Datos (asignaciones de roles/permisos, no bugs de código)
+
+### DATA-01 — Rol "Supervisor 1" con permisos de proveedores incompletos
+
+**Módulo:** Roles / Proveedores
+**Detectado:** 2026-07-10, durante la verificación de BUG-08.
+
+El rol no-admin `Supervisor 1` (id 3, sin usuarios asignados actualmente) tiene en `permiso_rol` los permisos `proveedors.crear` y `proveedors.editar`, pero **no** `proveedors.ver` ni `proveedors.eliminar`. Antes de corregir BUG-08 esto era invisible (todos bypaseaban el RBAC). Ahora, si se asigna algún usuario a este rol, podría crear/editar proveedores pero no vería el listado (`/proveedors` bloqueado por falta de `proveedors.ver`).
+
+**No es un bug de código** — es una asignación de datos incompleta, probablemente hecha antes de que `RolController::sync()` funcionara (BUG-01) o antes de que existiera el permiso `proveedors.ver` con el slug correcto (BUG-04/C-05). Corrección sugerida (pendiente de decisión, no aplicada): agregar `proveedors.ver` (y evaluar `proveedors.eliminar`) al rol desde la UI de Roles, o vía seeder si se documenta como parte del catálogo de roles del proyecto.
 
 ---
 
@@ -259,7 +309,8 @@ El sidebar de `app.blade.php` no tiene un enlace al módulo de compras. Para acc
 |---|---|---|
 | **Crítica** | ~~BUG-01~~ | ~~Asignación de permisos a roles no funciona~~ ✅ 2026-07-07 |
 | **Crítica** | ~~BUG-03~~ | ~~Ruta `/lotes` causa error 500~~ ✅ 2026-07-07 |
-| **Crítica** | BUG-07 | Rutas de permisos sin autenticación |
+| **Crítica** | ~~BUG-07~~ | ~~Rutas de permisos sin autenticación~~ ✅ 2026-07-10 |
+| **Crítica** | ~~BUG-08~~ | ~~`User::esAdmin()` devolvía `true` para cualquier usuario (RBAC anulado)~~ ✅ 2026-07-10 |
 | **Alta** | BUG-02 | No se puede editar el precio de un producto |
 | **Alta** | ~~BUG-04~~ | ~~Ventas pueden despachar lotes vencidos~~ ✅ 2026-07-07 |
 | **Alta** | ~~BUG-05~~ | ~~Registro público de usuarios puede fallar~~ ✅ 2026-07-07 |
@@ -274,6 +325,7 @@ El sidebar de `app.blade.php` no tiene un enlace al módulo de compras. Para acc
 | **Baja** | PEND-06 | Auditoría en ajustes de stock |
 | **Baja** | AUS-03 | Gestión de permisos desde UI |
 | **Baja** | AUS-04 | Enlace de compras en el sidebar |
+| **Baja** | DATA-01 | Rol "Supervisor 1" sin `proveedors.ver`/`proveedors.eliminar` |
 | **Baja** | ESQ-01 a ESQ-08 | Desajustes modelo/migración |
 
 ---
@@ -316,23 +368,36 @@ Deben resolverse juntos antes de hacer cualquier prueba con usuarios o evaluador
 
 ---
 
-### Sprint 2 — Errores críticos de seguridad
+### Sprint 2 — Errores críticos de seguridad ✅ COMPLETADO (2026-07-10)
 
 Estos dos problemas no producen crashes visibles pero comprometen la integridad del sistema de permisos.
 Resolverlos en la misma sesión ya que ambos afectan el módulo de permisos y proveedores.
 
-- **C-04 · SEC-01 — Proteger las rutas de `/permiso` con middleware `auth`**
+- [x] **C-04 · SEC-01 — Proteger las rutas de `/permiso` con middleware `auth`**
   El grupo `Route::prefix('permiso')` está registrado fuera de cualquier middleware `auth`.
   Las rutas de gestión de permisos son accesibles por usuarios no autenticados.
   La corrección es mover ese grupo dentro del bloque `middleware('auth')` en `web.php`.
   Referencia de auditoría: `routes/web.php` — grupo `/permiso`.
+  **Corregido:** ver detalle en BUG-07 más arriba.
 
-- **C-05 · BUG-04 — Corregir el mismatch de slugs de permisos de proveedores**
+- [x] **C-05 · BUG-04 — Corregir el mismatch de slugs de permisos de proveedores**
   `PermisoSeeder` crea los permisos con prefijo `proveedores.*` (con `e`), pero `web.php`
   aplica el middleware con `proveedors.*` (sin `e`). `PermisoMiddleware` nunca encuentra
   el permiso correcto y bloquea el acceso a proveedores para todos los roles no-admin.
   La corrección es unificar los slugs en el seeder a `proveedors.*` y re-ejecutar `db:seed`.
   Referencia de auditoría: `database/seeders/PermisoSeeder.php` · `routes/web.php`.
+  **Corregido:** se agregó un paso de renombrado en sitio (`Permiso::where('slug', $antiguo)->update(['slug' => $nuevo])`)
+  al inicio de `PermisoSeeder::run()`, antes del `updateOrCreate` habitual, para preservar los IDs de permiso existentes
+  en lugar de crear filas nuevas. Esto era necesario porque el rol no-admin "Supervisor 1" (id 3) ya tenía
+  `proveedores.crear`/`proveedores.editar` asignados en `permiso_rol`; un `updateOrCreate` directo con el slug nuevo
+  habría creado permisos huérfanos y roto esa asignación silenciosamente. Verificado contra la base de datos real:
+  mismos IDs (9-12), mismo conteo de filas en `permiso_rol` (37) antes y después, y `tienePermiso()` responde
+  correctamente para el rol afectado con los slugs nuevos.
+
+  **Hallazgo no relacionado detectado durante la verificación:** `User::esAdmin()` (`app/Models/User.php`) tenía
+  un bug de precedencia SQL que hacía que devolviera `true` para **cualquier** usuario del sistema, incluso sin
+  roles asignados, anulando de facto el RBAC. Catalogado y corregido como `BUG-08` (ver más arriba) en una sesión
+  posterior el mismo día (2026-07-10).
 
 ---
 

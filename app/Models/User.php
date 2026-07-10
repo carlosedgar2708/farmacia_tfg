@@ -54,10 +54,11 @@ class User extends Authenticatable
     }
     public function esAdmin(): bool
     {
-
         return $this->rols()
-            ->where('nombre', 'Administrador')
-            ->orWhere('slug', 'admin')
+            ->where(function ($q) {
+                $q->where('nombre', 'Administrador')
+                  ->orWhere('slug', 'admin');
+            })
             ->exists();
     }
 

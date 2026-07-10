@@ -9,6 +9,21 @@ class PermisoSeeder extends Seeder
 {
     public function run(): void
     {
+        // Los slugs de proveedores se sembraron originalmente como 'proveedores.*'
+        // pero las rutas (routes/web.php) y el middleware verifican 'proveedors.*'.
+        // Se renombran en sitio (no se crean permisos nuevos) para conservar los
+        // IDs y no romper asignaciones ya existentes en permiso_rol.
+        $renombres = [
+            'proveedores.ver'      => 'proveedors.ver',
+            'proveedores.crear'    => 'proveedors.crear',
+            'proveedores.editar'   => 'proveedors.editar',
+            'proveedores.eliminar' => 'proveedors.eliminar',
+        ];
+
+        foreach ($renombres as $antiguo => $nuevo) {
+            Permiso::where('slug', $antiguo)->update(['slug' => $nuevo]);
+        }
+
         $permisos = [
 
             // USUARIOS
@@ -24,10 +39,10 @@ class PermisoSeeder extends Seeder
             ['slug' => 'rols.eliminar', 'nombre' => 'Eliminar rol'],
 
             // PROVEEDORES
-            ['slug' => 'proveedores.ver',      'nombre' => 'Ver proveedores'],
-            ['slug' => 'proveedores.crear',    'nombre' => 'Crear proveedor'],
-            ['slug' => 'proveedores.editar',   'nombre' => 'Editar proveedor'],
-            ['slug' => 'proveedores.eliminar', 'nombre' => 'Eliminar proveedor'],
+            ['slug' => 'proveedors.ver',      'nombre' => 'Ver proveedores'],
+            ['slug' => 'proveedors.crear',    'nombre' => 'Crear proveedor'],
+            ['slug' => 'proveedors.editar',   'nombre' => 'Editar proveedor'],
+            ['slug' => 'proveedors.eliminar', 'nombre' => 'Eliminar proveedor'],
 
             // PRODUCTOS / STOCK
             ['slug' => 'productos.ver',     'nombre' => 'Ver productos'],
