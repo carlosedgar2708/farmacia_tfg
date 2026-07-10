@@ -15,6 +15,7 @@ use App\Http\Controllers\LoteController;
 use App\Http\Controllers\VentaController;
 use App\Http\Controllers\CompraController;
 use App\Http\Controllers\ConfiguracionController;
+use App\Http\Controllers\ReporteController;
 
 
 Route::middleware(['auth'])->group(function () {
@@ -123,6 +124,14 @@ Route::middleware('auth')->group(function () {
     Route::prefix('configuracion')->name('configuracion.')->group(function () {
         Route::get('/', [ConfiguracionController::class, 'edit'])->name('edit');
         Route::put('/', [ConfiguracionController::class, 'update'])->name('update');
+    });
+
+    // === REPORTES ===
+    Route::middleware('permiso:reportes.ver')->prefix('reportes')->name('reportes.')->group(function () {
+        Route::get('/', [ReporteController::class, 'index'])->name('index');
+        Route::get('/vencimientos', [ReporteController::class, 'vencimientos'])->name('vencimientos');
+        Route::get('/stock-valorizado', [ReporteController::class, 'stockValorizado'])->name('stockValorizado');
+        Route::get('/stock-bajo', [ReporteController::class, 'stockBajo'])->name('stockBajo');
     });
 });
 

@@ -201,6 +201,14 @@ a{ color:inherit }
 }
 .pagination .active span{ background:var(--primary); border-color:var(--primary); color:#fff }
 
+.empty-box{
+  background:#f4f6f8;
+  padding:20px;
+  border-radius:8px;
+  text-align:center;
+  color:#999;
+}
+
 /* =========================================================
    6) Modales (opcional)
    ========================================================= */

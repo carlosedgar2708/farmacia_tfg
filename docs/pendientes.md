@@ -242,7 +242,7 @@ Estos no son bugs activos (no causan errores ahora mismo) pero causarán errores
 **Trabajo pendiente:**
 - El `DashboardController` (actualmente sin rutas) tiene lógica más completa que `InicioController`. Considerar conectarlo o migrar su código al controlador activo.
 - Agregar filtros por rango de fechas.
-- Agregar alertas de stock bajo con umbral configurable.
+- Agregar alertas de stock bajo con umbral configurable — **deuda técnica anotada:** el widget "Productos con menos stock" sigue con el `30` hardcodeado en `inicio.blade.php`; el reporte "Productos con stock bajo" de `AUS-01` (2026-07-10) ya lee `Configuracion::obtener('stock_bajo_umbral', 30)`. Cuando se aborde este punto, el dashboard debe leer la misma clave para tener una única fuente de verdad.
 - Mostrar lotes próximos a vencer con columores de alerta.
 
 ---
@@ -259,17 +259,59 @@ Estos no son bugs activos (no causan errores ahora mismo) pero causarán errores
 
 ## Módulos Completamente Ausentes (no existe nada)
 
-### AUS-01 — Reportes
+### AUS-01 — Reportes 🔶 EN PROGRESO (módulo iniciado 2026-07-10)
 
-El seeder define el permiso `reportes.ver` pero no existe ningún controlador, ruta ni vista de reportes.
+El seeder define el permiso `reportes.ver`. El módulo se está implementando de forma incremental, un reporte por sprint, reutilizando al máximo la lógica ya existente.
 
 **Reportes mínimos esperados para una farmacia:**
-- Ventas por período (diario, mensual, anual) con filtro por usuario y cliente.
-- Compras por período con filtro por proveedor.
-- Stock valorizado (stock actual × costo unitario por lote).
-- Productos con stock bajo (por debajo de un umbral).
-- Lotes próximos a vencer (por rango de fechas).
-- Historial de movimientos de stock por producto o lote.
+- Ventas por período (diario, mensual, anual) con filtro por usuario y cliente. *(pendiente)*
+- Compras por período con filtro por proveedor. *(pendiente)*
+- Stock valorizado (stock actual × costo unitario por lote). ✅ **implementado (2026-07-10)**
+- Productos con stock bajo (por debajo de un umbral). ✅ **implementado (2026-07-10)**
+- Lotes próximos a vencer (por rango de fechas). ✅ **implementado (2026-07-10)**
+- Historial de movimientos de stock por producto o lote. *(pendiente — se solapa con `AUS-02`, ver nota ahí)*
+
+**Andamiaje común del módulo:** `GET /reportes` (nombre `reportes.index`) — landing con enlaces a los reportes disponibles. El sidebar apunta aquí (antes apuntaba directo al primer reporte). Todas las rutas viven bajo `Route::middleware('permiso:reportes.ver')->prefix('reportes')->name('reportes.')` en `routes/web.php`, y todos los métodos están en el mismo `ReporteController`.
+
+**Reporte 1 — "Lotes próximos a vencer" (implementado):**
+- **Ruta:** `GET /reportes/vencimientos` (nombre `reportes.vencimientos`).
+- **Controlador:** `app/Http/Controllers/ReporteController.php`, método `vencimientos()`.
+- **Vista:** `resources/views/reportes/vencimientos.blade.php`. Solo funcional, sin trabajo visual (a mejorar en una etapa posterior junto con el resto del sistema).
+- **Filtros:** estado (todos/vencidos/próximos), rango de fechas (`desde`/`hasta`, solo afecta a los "próximos"; los vencidos con stock se muestran siempre) y producto. Los filtros se conservan tras la búsqueda.
+- **Orden:** vencidos primero (más antiguos primero), luego próximos (más cercanos primero).
+- **Estado vacío:** mensaje amigable en vez de tabla vacía cuando no hay resultados.
+- **Reutilización (sin duplicar comparaciones de fechas):** el caso por defecto usa `Lote::vigentes()->proximosAVencer($diasAlerta)` tal cual. Se agregó un único scope nuevo, `Lote::scopeVenceEntre($desde, $hasta)` (`app/Models/Lote.php`), necesario solo para el caso de rango arbitrario elegido por el usuario, que ningún scope existente podía expresar. Los vencidos usan `Lote::vencidos()` sin cambios. El umbral por defecto sigue viniendo de `Configuracion::obtener('dias_alerta_vencimiento', 90)`. Cada fila se etiqueta `vencido`/`proximo` según el scope que la trajo (mismo patrón que ya usa `InicioController` para el widget del dashboard), no por una comparación de fecha nueva.
+- **Corrección posterior (2026-07-10, en revisión previa al Reporte 2):** si `desde`/`hasta` llegaban con una fecha no parseable por la URL (p. ej. `?desde=no-es-una-fecha`), `Carbon::parse()` lanzaba una excepción no capturada y la petición terminaba en `500`. Se agregó `ReporteController::fechaValida()`, que valida/normaliza la fecha antes de usarla y la ignora (en vez de romper la consulta) si no es parseable — mismo criterio ya usado para el rango invertido.
+- **Pruebas:** `tests/Feature/ReporteVencimientosTest.php` (Pest, 18 casos).
+
+**Reporte 2 — "Stock valorizado" (implementado):**
+- **Ruta:** `GET /reportes/stock-valorizado` (nombre `reportes.stockValorizado`).
+- **Controlador:** `ReporteController::stockValorizado()`.
+- **Vista:** `resources/views/reportes/stock_valorizado.blade.php`. Igual que el reporte anterior, solo funcional.
+- **Filtro:** por producto (opcional). Se conserva tras la búsqueda (`->paginate()->withQueryString()`, mismo patrón que `ProductoController::index()`).
+- **Orden:** por valor descendente (`stock × costo_unitario`), calculado y ordenado en SQL (`orderByRaw`), no en PHP — evita cargar todo el catálogo en memoria como sí requirió el reporte anterior (ahí era necesario por combinar dos scopes con etiquetado; aquí es una sola consulta filtrada, así que se usó el patrón de paginación estándar del proyecto).
+- **Total general:** `SUM(stock * costo_unitario)` calculado en SQL sobre el conjunto ya filtrado (no sobre la página actual), en una consulta aparte clonando el query base.
+- **Reutilización:** nuevo accessor `Lote::getValorAttribute()` (`stock * costo_unitario`), siguiendo el mismo patrón ya usado en `Venta::getTotalAttribute()`, `Compra::getTotalAttribute()`, `DetalleVenta::getSubtotalAttribute()` y `DetalleCompra::getSubtotalAttribute()` — no es lógica nueva, es aplicar la convención ya existente al modelo que le faltaba.
+- **Pruebas:** `tests/Feature/ReporteStockValorizadoTest.php` (Pest, 12 casos).
+
+**Reporte 3 — "Productos con stock bajo" (implementado):**
+- **Ruta:** `GET /reportes/stock-bajo` (nombre `reportes.stockBajo`).
+- **Controlador:** `ReporteController::stockBajo()`.
+- **Vista:** `resources/views/reportes/stock_bajo.blade.php`. Igual que los reportes anteriores, solo funcional.
+- **Nivel de agregación:** por producto (no por lote), a diferencia de los dos reportes anteriores — así lo pide `AUS-01` ("Productos con stock bajo").
+- **Umbral:** `Configuracion::obtener('stock_bajo_umbral', 30)` como valor por defecto (mismo patrón que `dias_alerta_vencimiento`), con override puntual por query string (`?umbral=`). No se agregó campo a `/configuracion` en este sprint (decisión explícita del usuario) — `Configuracion::obtener()` ya resuelve el default sin que la clave exista en la tabla.
+- **Regla de negocio confirmada:** los productos con `stock_total = 0`, incluidos los que no tienen ningún lote registrado, **sí aparecen** (es el caso más crítico — "requieren reposición"). Se etiquetan `sin_stock` (badge `SIN STOCK`) distinto de `bajo` (badge `STOCK BAJO`) para los que tienen stock > 0 pero por debajo del umbral.
+- **Filtro:** por producto (opcional), igual que los otros dos reportes.
+- **Orden:** ascendente por stock total (los más críticos primero).
+- **Reutilización:** `Producto::withSum('lotes as stock_total', 'stock')`, el mismo patrón ya usado en `ProductoController::index()` para la columna "Stock total" del catálogo — no la versión de `leftJoin`+`groupBy` manual que usa `InicioController` para el widget del dashboard (ambas calculan lo mismo; se reutilizó la más idiomática y ya probada).
+- **Problema encontrado y corregido durante la implementación:** `withSum()` deja `stock_total` en `NULL` (no `0`) para productos sin ningún lote — confirmado también en `ProductoController`/`productos/index.blade.php`, que por eso hace `{{ $p->stock_total ?? 0 }}` en la vista. Filtrar directamente por `stock_total < $umbral` habría excluido justo los productos sin lotes, violando la regla de negocio de este reporte. Se probó primero con `HAVING`/`GROUP BY` sobre el alias (funciona en MySQL) pero falló en SQLite (motor de los tests: *"HAVING clause on a non-aggregate query"*) y, ajustado con `GROUP BY productos.id`, volvió a fallar en MySQL real (*"'productos.codigo' isn't in GROUP BY"*, con `ONLY_FULL_GROUP_BY`). Se resolvió reemplazando el `HAVING` por un `WHERE`/`ORDER BY` con la misma suma correlacionada expresada como subquery explícita (`COALESCE((select sum(stock) from lotes where...), 0)`), portable entre ambos motores — verificado en ambos (SQLite vía los tests, MySQL real vía `tinker` con datos temporales revertidos).
+- **Pruebas:** `tests/Feature/ReporteStockBajoTest.php` (Pest, 16 casos).
+
+**Deuda técnica anotada (no corregida en este sprint):** el widget "Productos con menos stock" del dashboard (`InicioController`/`inicio.blade.php`) sigue usando el umbral `30` hardcodeado directamente en la vista, en vez de `Configuracion::obtener('stock_bajo_umbral', 30)`. Cuando se decida hacer editable `stock_bajo_umbral` desde `/configuracion` (como ya lo es `dias_alerta_vencimiento`), el dashboard y este reporte deben leer la misma configuración para no tener dos fuentes de verdad del mismo número.
+
+**Cambio transversal:** los helpers de prueba (`crearUsuarioDePrueba`, `crearProductoDePrueba`, `crearLoteDePrueba`) se movieron de `ReporteVencimientosTest.php` a `tests/Pest.php` para compartirlos entre los dos archivos de test de Reportes sin duplicar código (y sin colisión de nombres de función entre archivos, que habría roto la suite).
+
+Detalle completo de ambas sesiones en `docs/diario_desarrollo.md` (entradas 2026-07-10).
 
 ---
 
@@ -317,7 +359,7 @@ El sidebar de `app.blade.php` no tiene un enlace al módulo de compras. Para acc
 | **Alta** | PEND-01 | Implementar recibos completamente |
 | **Alta** | PEND-02 | Implementar devoluciones completamente |
 | **Media** | PEND-03 | Anulación de ventas |
-| **Media** | AUS-01 | Módulo de reportes |
+| **Media** | AUS-01 | Módulo de reportes 🔶 en progreso — "Lotes próximos a vencer", "Stock valorizado" y "Productos con stock bajo" ✅ 2026-07-10 |
 | **Media** | AUS-02 | Vista de movimientos de stock |
 | **Media** | PEND-05 | Dashboard con datos reales y alertas |
 | **Baja** | BUG-06 | Scopes de movimientos de stock |

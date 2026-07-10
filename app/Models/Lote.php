@@ -32,6 +32,16 @@ class Lote extends Model
     }
 
     /**
+     * Valor del stock de este lote (stock actual x costo unitario). Mismo
+     * patrón de accessor derivado que Venta::getTotalAttribute() y
+     * DetalleCompra::getSubtotalAttribute().
+     */
+    public function getValorAttribute(): float
+    {
+        return (float) ($this->stock * $this->costo_unitario);
+    }
+
+    /**
      * Lotes vendibles: sin fecha de vencimiento o con fecha futura/hoy.
      */
     public function scopeVigentes($query)
@@ -59,5 +69,17 @@ class Lote extends Model
         return $query->whereNotNull('fecha_vencimiento')
             ->whereDate('fecha_vencimiento', '>=', today())
             ->whereDate('fecha_vencimiento', '<=', today()->copy()->addDays($dias));
+    }
+
+    /**
+     * Lotes cuya fecha de vencimiento cae dentro de un rango arbitrario [$desde, $hasta].
+     * A diferencia de proximosAVencer(), no ancla el límite inferior a "hoy" — para
+     * reportes que permiten explorar cualquier rango elegido por el usuario.
+     */
+    public function scopeVenceEntre($query, $desde, $hasta)
+    {
+        return $query->whereNotNull('fecha_vencimiento')
+            ->whereDate('fecha_vencimiento', '>=', $desde)
+            ->whereDate('fecha_vencimiento', '<=', $hasta);
     }
 }

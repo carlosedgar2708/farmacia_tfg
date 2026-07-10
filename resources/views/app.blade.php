@@ -76,6 +76,12 @@
           </a>
           @endif
 
+          @if (Route::has('reportes.index'))
+          <a href="{{ route('reportes.index') }}" class="sb-item {{ request()->routeIs('reportes.*') ? 'active' : '' }}">
+            <i class="ri-file-chart-2-line"></i><span>Reportes</span>
+          </a>
+          @endif
+
           @if (Route::has('rols.index'))
           <a href="{{ route('rols.index') }}" class="sb-item {{ request()->routeIs('rols.*') ? 'active' : '' }}">
             <i class="ri-lock-2-line"></i><span>Roles</span>

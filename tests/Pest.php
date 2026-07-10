@@ -41,7 +41,34 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function crearUsuarioDePrueba(): \App\Models\User
 {
-    // ..
+    return \App\Models\User::create([
+        'username' => 'user-' . uniqid(),
+        'name' => 'Usuario de Prueba',
+        'email' => uniqid() . '@example.com',
+        'password' => bcrypt('password'),
+        'activo' => true,
+    ]);
+}
+
+function crearProductoDePrueba(string $codigo): \App\Models\Producto
+{
+    return \App\Models\Producto::create([
+        'codigo' => $codigo,
+        'nombre' => "Producto {$codigo}",
+        'es_inyectable' => false,
+        'precio_venta' => 10,
+    ]);
+}
+
+function crearLoteDePrueba(\App\Models\Producto $producto, string $nroLote, ?string $fechaVencimiento, int $stock, float $costoUnitario = 5): \App\Models\Lote
+{
+    return \App\Models\Lote::create([
+        'producto_id' => $producto->id,
+        'nro_lote' => $nroLote,
+        'fecha_vencimiento' => $fechaVencimiento,
+        'costo_unitario' => $costoUnitario,
+        'stock' => $stock,
+    ]);
 }
