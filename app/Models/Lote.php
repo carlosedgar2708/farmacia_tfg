@@ -30,4 +30,34 @@ class Lote extends Model
     {
         return $this->belongsTo(Producto::class);
     }
+
+    /**
+     * Lotes vendibles: sin fecha de vencimiento o con fecha futura/hoy.
+     */
+    public function scopeVigentes($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('fecha_vencimiento')
+              ->orWhereDate('fecha_vencimiento', '>=', today());
+        });
+    }
+
+    /**
+     * Lotes ya vencidos.
+     */
+    public function scopeVencidos($query)
+    {
+        return $query->whereNotNull('fecha_vencimiento')
+            ->whereDate('fecha_vencimiento', '<', today());
+    }
+
+    /**
+     * Lotes vigentes cuya fecha de vencimiento cae dentro de los próximos $dias días.
+     */
+    public function scopeProximosAVencer($query, int $dias)
+    {
+        return $query->whereNotNull('fecha_vencimiento')
+            ->whereDate('fecha_vencimiento', '>=', today())
+            ->whereDate('fecha_vencimiento', '<=', today()->copy()->addDays($dias));
+    }
 }

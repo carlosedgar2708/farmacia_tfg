@@ -38,7 +38,9 @@ class RolController extends Controller
             'descripcion' => 'nullable|string|max:255',
         ]);
 
-        Rol::create($validated);
+        $rol = Rol::create($validated);
+        $rol->permisos()->sync($request->input('permisos', []));
+
         return redirect()->route('rols.index')->with('success', 'Rol creado correctamente.');
     }
 
@@ -61,6 +63,8 @@ class RolController extends Controller
         ]);
 
         $rol->update($validated);
+        $rol->permisos()->sync($request->input('permisos', []));
+
         return redirect()->route('rols.index')->with('success', 'Rol actualizado correctamente.');
     }
     public function destroy(Rol $rol)

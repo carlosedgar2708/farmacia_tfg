@@ -6,9 +6,9 @@ use App\Models\User;
 use App\Models\Rol;
 use App\Models\Proveedor;
 use App\Models\Producto;
-use App\Models\Lote;
 use App\Models\Venta;
 use App\Models\DetalleVenta;
+use App\Models\Configuracion;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -63,18 +63,27 @@ class InicioController extends Controller
             ->limit(5)
             ->get();
 
-        // ====== PRÓXIMOS A VENCER (<= 4 meses) ======
-        $limiteVence = Carbon::today()->addMonths(4);
+        // ====== PRÓXIMOS A VENCER (umbral configurable, ver Configuracion) ======
+        // Estado por PRODUCTO (no por lote), con prioridad: vencido > próximo a vencer > ok.
+        // La comparación de fechas vive únicamente en los scopes de Lote (vencidos/proximosAVencer);
+        // aquí solo se compone el resultado por producto.
+        $diasAlertaVencimiento = Configuracion::obtener('dias_alerta_vencimiento', 90);
 
-        $proximosVencer = Lote::with('producto')
-            ->whereNull('deleted_at')
-            ->whereNotNull('fecha_vencimiento')
-            ->orderBy('fecha_vencimiento','asc')
+        $proximosVencer = Producto::whereNull('deleted_at')
+            ->conAlertaVencimiento($diasAlertaVencimiento)
+            ->withExists(['lotes as tiene_vencido' => fn ($q) => $q->where('stock', '>', 0)->vencidos()])
+            ->orderByDesc('tiene_vencido')
             ->limit(5)
             ->get()
-            ->map(function($l) use ($limiteVence){
-                $l->vence_pronto = Carbon::parse($l->fecha_vencimiento)->lte($limiteVence);
-                return $l;
+            ->map(function ($p) use ($diasAlertaVencimiento) {
+                if ($p->tiene_vencido) {
+                    $p->estado_vencimiento = 'vencido';
+                    $p->lote_relevante = $p->loteVencidoRelevante();
+                } else {
+                    $p->estado_vencimiento = 'proximo';
+                    $p->lote_relevante = $p->loteProximoRelevante($diasAlertaVencimiento);
+                }
+                return $p;
             });
 
         return view('inicio', compact(

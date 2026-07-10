@@ -14,6 +14,7 @@ use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\LoteController;
 use App\Http\Controllers\VentaController;
 use App\Http\Controllers\CompraController;
+use App\Http\Controllers\ConfiguracionController;
 
 
 Route::middleware(['auth'])->group(function () {
@@ -44,7 +45,6 @@ Route::get('/', [InicioController::class, 'index'])
     ->middleware('auth');
 
 Route::middleware('auth')->group(function () {
-Route::resource('lotes', LoteController::class);
     // === DASHBOARD ===
     Route::get('/inicio', [InicioController::class, 'index'])->name('inicio');
 
@@ -117,6 +117,12 @@ Route::resource('lotes', LoteController::class);
         Route::middleware('permiso:proveedors.crear')->post('/', [ProveedorController::class, 'store'])->name('store');
         Route::middleware('permiso:proveedors.editar')->put('/{proveedor}', [ProveedorController::class, 'update'])->name('update');
         Route::middleware('permiso:proveedors.eliminar')->delete('/{proveedor}', [ProveedorController::class, 'destroy'])->name('destroy');
+    });
+
+    // === CONFIGURACIÓN DEL SISTEMA (solo admin, verificado en el controlador) ===
+    Route::prefix('configuracion')->name('configuracion.')->group(function () {
+        Route::get('/', [ConfiguracionController::class, 'edit'])->name('edit');
+        Route::put('/', [ConfiguracionController::class, 'update'])->name('update');
     });
 });
 

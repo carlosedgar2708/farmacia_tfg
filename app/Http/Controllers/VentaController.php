@@ -30,7 +30,7 @@ class VentaController extends Controller
 
         // Traigo el precio del produto
         $productosForJs = Producto::with([
-                'lotes' => fn($q) => $q->where('stock','>',0)->orderBy('fecha_vencimiento'),
+                'lotes' => fn($q) => $q->where('stock','>',0)->vigentes()->orderBy('fecha_vencimiento'),
             ])
             ->orderBy('nombre')
             ->get(['id','nombre','precio_venta'])
@@ -104,6 +104,7 @@ class VentaController extends Controller
                 // con esto tragio mis productos por orden de vecimiento
                 $lotes = Lote::where('producto_id', $productoId)
                     ->where('stock', '>', 0)
+                    ->vigentes()
                     ->orderByRaw('fecha_vencimiento IS NULL, fecha_vencimiento ASC')
                     ->lockForUpdate()
                     ->get();

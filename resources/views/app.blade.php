@@ -88,6 +88,12 @@
           </a>
           @endif
 
+          @if (Route::has('configuracion.edit') && auth()->user()->esAdmin())
+          <a href="{{ route('configuracion.edit') }}" class="sb-item {{ request()->routeIs('configuracion.*') ? 'active' : '' }}">
+            <i class="ri-settings-3-line"></i><span>Configuración</span>
+          </a>
+          @endif
+
           <div class="sb-section">Casos de uso</div>
           {{-- **Mapea tus CU** a vistas reales cuando existan rutas. Por ahora dejo # cuando no haya ruta.
           <a href="{{ Route::has('login') ? route('login') : '#' }}" class="sb-item">

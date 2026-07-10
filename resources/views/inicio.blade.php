@@ -107,32 +107,34 @@
         {{-- ======= 4. PRÓXIMOS A VENCER ======= --}}
         <div class="info-box">
         <h3>⏳ Próximos a vencer</h3>
-        <p class="small-note">Los que estén en 4 meses o menos deben estar en rojo.</p>
+        <p class="small-note">Un lote vencido con stock tiene prioridad sobre cualquier otro lote del mismo producto.</p>
 
         @if(($proximosVencer ?? collect())->isEmpty())
             <div class="empty-box">Sin datos aún.</div>
         @else
             <div class="info-list">
-            @foreach($proximosVencer as $l)
-                @php $soon = (bool)$l->vence_pronto; @endphp
+            @foreach($proximosVencer as $p)
+                @php $vencido = $p->estado_vencimiento === 'vencido'; @endphp
                 <div class="info-item">
                 <div class="left">
-                    <div class="title {{ $soon ? 'text-danger' : '' }}">
-                    {{ $l->producto->nombre ?? 'Producto' }}
+                    <div class="title text-danger">
+                    {{ $p->nombre }}
                     </div>
                     <div class="sub">
-                    Lote {{ $l->nro_lote }} · Vence {{ $l->fecha_vencimiento }}
+                    @if($p->lote_relevante)
+                        Lote {{ $p->lote_relevante->nro_lote }} · Vence {{ $p->lote_relevante->fecha_vencimiento }}
+                    @endif
                     </div>
                 </div>
-                <span class="badge {{ $soon ? 'danger' : 'warn' }}">
-                    {{ $soon ? 'Vence pronto' : 'OK' }}
+                <span class="badge danger">
+                    {{ $vencido ? 'VENCIDO' : 'Vence pronto' }}
                 </span>
                 </div>
             @endforeach
             </div>
         @endif
 
-        <a href="{{ route('lotes.index') }}" class="btn add mt-12">Ver más →</a>
+        <a href="{{ route('productos.index') }}" class="btn add mt-12">Ver más →</a>
         </div>
 
 
