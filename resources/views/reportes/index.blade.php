@@ -17,6 +17,15 @@
     <a href="{{ route('reportes.stockBajo') }}" class="btn-outline" style="justify-content:flex-start">
       <i class="ri-alert-line"></i> Productos con stock bajo
     </a>
+    <a href="{{ route('reportes.compras') }}" class="btn-outline" style="justify-content:flex-start">
+      <i class="ri-truck-line"></i> Compras por período
+    </a>
+    <a href="{{ route('reportes.ventas') }}" class="btn-outline" style="justify-content:flex-start">
+      <i class="ri-shopping-bag-3-line"></i> Ventas por período
+    </a>
+    <a href="{{ route('reportes.movimientos') }}" class="btn-outline" style="justify-content:flex-start">
+      <i class="ri-exchange-line"></i> Historial de movimientos de stock
+    </a>
   </div>
 </section>
 @endsection

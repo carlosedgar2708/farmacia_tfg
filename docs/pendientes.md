@@ -156,6 +156,27 @@ $this->rols()->where(function ($q) {
 
 ---
 
+### BUG-09 — `MovimientoStock` no podía consultarse (era `ESQ-05`) ✅ CORREGIDO (2026-07-12)
+
+**Módulo:** Movimientos de Stock
+**Archivo:** `app/Models/MovimientoStock.php`
+
+Detectado como bloqueante al implementar el Reporte 6 ("Historial de movimientos de stock") de `AUS-01`. Ya estaba catalogado como `ESQ-05` ("El modelo usa `SoftDeletes` pero la migración no tiene columna `deleted_at`"), pero esa nota subestimaba el impacto real: el modelo declara `use SoftDeletes`, que registra un global scope aplicado a **toda** consulta `SELECT` (`WHERE deleted_at IS NULL`). Como la tabla `movimientos_stock` nunca tuvo esa columna, **cualquier lectura del modelo, sin excepción, fallaba con un error SQL real** — confirmado tanto en SQLite (tests) como en MySQL real (`farmacia_tfg`) con un simple `MovimientoStock::count()`.
+
+**Por qué era "latente":** el scope solo afecta lecturas, no escrituras. `CompraController::store()` y `VentaController::store()` solo hacen `MovimientoStock::create(...)`, nunca leen — por eso el sistema pudo escribir movimientos con normalidad durante meses sin que nadie lo notara, hasta que se construyó la primera pantalla que efectivamente consulta esta tabla.
+
+**Análisis de alternativas realizado antes de corregir** (a pedido del usuario, tratando esto como bug previo a resolver, no como ampliación del alcance del Reporte 6):
+- **Opción A — Agregar `deleted_at` vía migración:** conserva el trait, pero habilita soft-delete sobre registros de auditoría — una capacidad no solicitada y conceptualmente cuestionable para una tabla de trazabilidad.
+- **Opción B — Quitar el trait `SoftDeletes`:** sin migración, sin cambio de esquema. Se confirmó por búsqueda exhaustiva en `app/` que **ningún** punto del código llama a `->delete()`, `->restore()`, `->withTrashed()` u `->onlyTrashed()` sobre `MovimientoStock` — solo se usa `::create()`. Coherente con el diseño ya acordado para `PEND-03` (anulación de ventas), que contempla generar **movimientos compensatorios**, no ocultar/eliminar los originales.
+
+**Corregido:** se eligió la Opción B. Único cambio: se quitó `use SoftDeletes;` (y su import) de `MovimientoStock.php`. Sin migraciones, sin cambios de esquema, sin tocar `Compra`, `Venta`, `Devolucion`, `CompraController` ni `VentaController`.
+
+**Impacto sobre datos existentes:** ninguno. Se confirmó que en la BD real solo existía **1 fila** en `movimientos_stock` antes del fix (la única venta real registrada); el cambio no requiere backfill ni pone en riesgo esa fila.
+
+**Verificado:** `MovimientoStock::count()`/`::query()->get()` funcionan correctamente contra SQLite (tests) y MySQL real (antes fallaban en ambos). Se simuló, en una transacción revertida, la creación de un `MovimientoStock` igual a como lo hacen `CompraController`/`VentaController` — funciona idéntico a antes del fix (las escrituras nunca dependieron del trait). Suite completa sin regresiones.
+
+---
+
 ## Problemas de Datos (asignaciones de roles/permisos, no bugs de código)
 
 ### DATA-01 — Rol "Supervisor 1" con permisos de proveedores incompletos
@@ -179,7 +200,7 @@ Estos no son bugs activos (no causan errores ahora mismo) pero causarán errores
 | ESQ-02 | `Devolucion` | `fillable` incluye `venta_id`, `cliente_id`, `fecha_devolucion`, `observacion`, `estado`. Ninguno existe en la migración. |
 | ESQ-03 | `DetalleDevolucion` | `fillable` incluye `producto_id`, `precio_unitario`, `razon`. Ninguno existe en la migración. |
 | ESQ-04 | `Compra` | `fillable` incluye `observacion` y `estado`. Ninguno existe en la migración. |
-| ESQ-05 | `MovimientoStock` | El modelo usa `SoftDeletes` pero la migración no tiene columna `deleted_at`. |
+| ~~ESQ-05~~ | `MovimientoStock` | ~~El modelo usa `SoftDeletes` pero la migración no tiene columna `deleted_at`.~~ ✅ Corregido como `BUG-09` (2026-07-12) — se quitó el trait, ver detalle arriba. |
 | ESQ-06 | `Rol` | La migración tiene `deleted_at`, pero el modelo no usa el trait `SoftDeletes`. |
 | ESQ-07 | `Permiso` | La migración tiene `deleted_at`, pero el modelo no usa el trait `SoftDeletes`. |
 | ESQ-08 | `Cliente` | El modelo castea el campo `activo` a boolean, pero esa columna no existe en la migración. |
@@ -259,17 +280,17 @@ Estos no son bugs activos (no causan errores ahora mismo) pero causarán errores
 
 ## Módulos Completamente Ausentes (no existe nada)
 
-### AUS-01 — Reportes 🔶 EN PROGRESO (módulo iniciado 2026-07-10)
+### AUS-01 — Reportes ✅ COMPLETADO (2026-07-10 a 2026-07-12) — 6/6 reportes
 
 El seeder define el permiso `reportes.ver`. El módulo se está implementando de forma incremental, un reporte por sprint, reutilizando al máximo la lógica ya existente.
 
 **Reportes mínimos esperados para una farmacia:**
-- Ventas por período (diario, mensual, anual) con filtro por usuario y cliente. *(pendiente)*
-- Compras por período con filtro por proveedor. *(pendiente)*
+- Ventas por período (diario, mensual, anual) con filtro por usuario y cliente. ✅ **implementado (2026-07-12)**
+- Compras por período con filtro por proveedor. ✅ **implementado (2026-07-12)**
 - Stock valorizado (stock actual × costo unitario por lote). ✅ **implementado (2026-07-10)**
 - Productos con stock bajo (por debajo de un umbral). ✅ **implementado (2026-07-10)**
 - Lotes próximos a vencer (por rango de fechas). ✅ **implementado (2026-07-10)**
-- Historial de movimientos de stock por producto o lote. *(pendiente — se solapa con `AUS-02`, ver nota ahí)*
+- Historial de movimientos de stock por producto o lote. ✅ **implementado (2026-07-12)** — resuelve conjuntamente `AUS-02`, ver nota abajo.
 
 **Andamiaje común del módulo:** `GET /reportes` (nombre `reportes.index`) — landing con enlaces a los reportes disponibles. El sidebar apunta aquí (antes apuntaba directo al primer reporte). Todas las rutas viven bajo `Route::middleware('permiso:reportes.ver')->prefix('reportes')->name('reportes.')` en `routes/web.php`, y todos los métodos están en el mismo `ReporteController`.
 
@@ -309,20 +330,58 @@ El seeder define el permiso `reportes.ver`. El módulo se está implementando de
 
 **Deuda técnica anotada (no corregida en este sprint):** el widget "Productos con menos stock" del dashboard (`InicioController`/`inicio.blade.php`) sigue usando el umbral `30` hardcodeado directamente en la vista, en vez de `Configuracion::obtener('stock_bajo_umbral', 30)`. Cuando se decida hacer editable `stock_bajo_umbral` desde `/configuracion` (como ya lo es `dias_alerta_vencimiento`), el dashboard y este reporte deben leer la misma configuración para no tener dos fuentes de verdad del mismo número.
 
-**Cambio transversal:** los helpers de prueba (`crearUsuarioDePrueba`, `crearProductoDePrueba`, `crearLoteDePrueba`) se movieron de `ReporteVencimientosTest.php` a `tests/Pest.php` para compartirlos entre los dos archivos de test de Reportes sin duplicar código (y sin colisión de nombres de función entre archivos, que habría roto la suite).
+**Reporte 4 — "Compras por período" (implementado):**
+- **Ruta:** `GET /reportes/compras` (nombre `reportes.compras`).
+- **Controlador:** `ReporteController::compras()`.
+- **Vista:** `resources/views/reportes/compras.blade.php`. Igual que los reportes anteriores, solo funcional.
+- **Nivel de agregación:** una fila por compra (no por detalle/ítem), igual que ya lista `compras/index.blade.php`. Columnas: fecha, proveedor, usuario que registró, cantidad de ítems y total de la compra.
+- **Filtros:** rango de fechas (`desde`/`hasta`, ambos opcionales, sin período por defecto — decisión explícita del usuario: sin fechas se muestran **todas** las compras, igual que hoy `CompraController::index()`) y proveedor.
+- **Orden:** fecha descendente (mismo criterio que `CompraController::index()->latest('fecha')`).
+- **Reutilización:** relaciones `Compra::proveedor()`/`Compra::user()` sin cambios; `ReporteController::fechaValida()` (ya existente desde el Reporte 1) reutilizado desde el diseño para `desde`/`hasta`, evitando repetir el bug de fecha inválida que tuvimos que corregir después la vez pasada.
+- **`Compra::getTotalAttribute()` no se reutilizó:** sirve para una compra individual (suma en PHP sobre `$this->detalles` cargados), pero en un listado paginado de muchas compras generaría N+1/cálculo en memoria innecesario. Se calculó en SQL en su lugar: el total por compra vía subquery correlacionada (`SUM(cantidad * costo_unitario)` sobre `detalles_compra`, mismo patrón que "Stock valorizado"), y el total general vía un `JOIN` + `SUM` agregado sobre todas las compras filtradas (no solo la página actual). No se usó `HAVING`/`GROUP BY` sobre un alias, aplicando desde el diseño la lección de portabilidad MySQL/SQLite aprendida en el Reporte 3.
+- **Vacío de datos señalado, no corregido:** `Compra` tiene `estado` en `$fillable` pero la migración de `compras` no tiene esa columna (`ESQ-04`, ya documentado) — no existe concepto de "compra anulada" persistido, así que el reporte no aplica ningún filtro de estado (no hay nada que filtrar). `proveedor_id` nunca es nulo en `compras`, a diferencia de `ventas.cliente_id`.
+- **Pruebas:** `tests/Feature/ReporteComprasTest.php` (Pest, 16 casos).
 
-Detalle completo de ambas sesiones en `docs/diario_desarrollo.md` (entradas 2026-07-10).
+**Reporte 5 — "Ventas por período" (implementado):**
+- **Ruta:** `GET /reportes/ventas` (nombre `reportes.ventas`).
+- **Controlador:** `ReporteController::ventas()`.
+- **Vista:** `resources/views/reportes/ventas.blade.php`. Igual que los reportes anteriores, solo funcional.
+- **Nivel de agregación:** una fila por venta (no por detalle/ítem), mismo criterio que "Compras por período" y que `ventas/index.blade.php`.
+- **Columnas:** fecha, cliente (`—` si es venta a público general, mismo criterio que ya usa `ventas/index.blade.php` — nota: `docs/modulos.md` dice "Público general" pero el código real muestra `—`; no se corrigió, fuera de alcance), usuario que registró, estado (**informativo, sin filtro** — `PEND-03`/anulación de ventas no existe todavía, así que no se adelantó esa funcionalidad, según instrucción explícita del usuario), unidades vendidas y total bruto.
+- **Filtros:** rango de fechas (`desde`/`hasta`, ambos opcionales, sin período por defecto — mismo criterio que "Compras": sin fechas se muestran todas las ventas), usuario (`user_id`) y cliente (`cliente_id`). Sin filtro de estado.
+- **Orden:** fecha descendente (mismo criterio que `VentaController::index()->latest('fecha_venta')`).
+- **"Unidades vendidas" en vez de conteo de filas:** se usa `SUM(detalles_venta.cantidad)`, no `COUNT(*)` de `detalles_venta`. Un mismo producto puede generar varios `DetalleVenta` si el FIFO de `VentaController::store()` tomó stock de más de un lote — `COUNT(*)` habría mostrado un número inflado por ese detalle de implementación, no la cantidad real de unidades vendidas. Verificado con un caso de prueba dedicado (producto repartido en 2 lotes dentro de la misma venta).
+- **`Venta::getTotalAttribute()` no se reutilizó**, por el mismo motivo que en "Compras" (evitar cálculo en PHP en un listado paginado) y por consistencia con el resto del módulo: total por venta y total general calculados en SQL, sin `HAVING`/`GROUP BY` sobre alias.
+- **Limitación de datos — descuento no persistido (analizada en detalle, no corregida por instrucción explícita):** `VentaController::store()` calcula un total con descuento restado, pero nunca lo persiste (`detalles_venta` no tiene columna `descuento`; el intento de guardar el total en `recibos.monto` se descarta en silencio porque esa columna no existe en la migración de `recibos`, ver `PEND-01`). El total de este reporte es, por lo tanto, el **bruto** reconstruido desde `detalles_venta` (`SUM(cantidad × precio_unitario)`), no el neto realmente cobrado en ventas con descuento. **No es una limitación nueva de este reporte** — `ventas/index.blade.php` ya muestra hoy el mismo cálculo bruto vía `Venta::getTotalAttribute()`, así que el reporte es consistente con lo que el sistema ya muestra en todos lados. Se agregó una nota visible en `reportes/ventas.blade.php` explicando esta limitación, y la columna se etiqueta "Total (bruto)". Corregirlo requeriría agregar una columna `descuento` a `detalles_venta` y modificar `VentaController::store()` — cambio funcional al módulo de Ventas explícitamente fuera de alcance de este sprint.
+- **Pruebas:** `tests/Feature/ReporteVentasTest.php` (Pest, 20 casos).
+
+**Reporte 6 — "Historial de movimientos de stock" (implementado) — resuelve conjuntamente `AUS-01` y `AUS-02`:**
+- **Ruta:** `GET /reportes/movimientos` (nombre `reportes.movimientos`).
+- **Controlador:** `ReporteController::movimientos()`.
+- **Vista:** `resources/views/reportes/movimientos.blade.php`. Igual que los reportes anteriores, solo funcional.
+- **Bug previo necesario para desbloquear este reporte:** ver `BUG-09` más arriba — `MovimientoStock` no podía consultarse en absoluto (`ESQ-05`). Se corrigió (quitando `SoftDeletes` del modelo) como paso previo, no como parte del alcance funcional de este reporte.
+- **`AUS-01` y `AUS-02` consolidados en una sola implementación:** ambos ítems del backlog pedían la misma funcionalidad (historial de `movimientos_stock` filtrable por producto/lote/tipo/fecha) — `AUS-02` se había escrito en la auditoría original, antes de que existiera el módulo de Reportes. Se implementó una sola vez, dentro de la estructura ya establecida (`ReporteController`, `/reportes`, `reportes.*`, permiso `reportes.ver`), en vez de construir una segunda pantalla duplicada. `AUS-02` se marca resuelto por esta misma implementación (ver su entrada más abajo).
+- **Nivel de agregación:** una fila por movimiento (registro crudo de `movimientos_stock`), a diferencia de los otros 5 reportes (que agregan a nivel de transacción de negocio). Es el único reporte pensado como libro de auditoría, no como resumen — agregar destruiría la trazabilidad que pide `AUS-02`. También es el único de los 6 que no requiere ningún cálculo (`SUM`/`COUNT`), así que no hereda el riesgo de portabilidad MySQL/SQLite de los reportes 3-5.
+- **Columnas:** fecha, producto (vía `lote.producto`), lote, tipo (badge Entrada/Salida), motivo, cantidad, referencia (texto libre).
+- **Filtros:** producto, lote, tipo (Entrada/Salida) y rango de fechas (`desde`/`hasta`, sin período por defecto) — exactamente los 4 filtros pedidos entre `AUS-01` ("por producto o lote") y `AUS-02` ("lote, producto, tipo, fecha"). Sin filtro de `motivo` (no estaba en ninguno de los dos backlogs, decisión explícita del usuario de no ampliar el alcance).
+- **No se usan `MovimientoStock::user()` ni `MovimientoStock::referencia()`:** ambas relaciones están rotas (referencian `user_id`/`referencia_tipo`/`referencia_id`, columnas que no existen en la migración). El campo `referencia` se muestra tal cual, como el texto libre que es. No se corrigieron estas relaciones (fuera de alcance).
+- **`BUG-06` no se corrige:** se filtra por la columna `tipo` (`Entrada`/`Salida`, poblada correctamente por `CompraController`/`VentaController`) en vez de usar `scopeEntradas()`/`scopeSalidas()` (rotos, filtran por el signo de `cantidad`, que siempre es positivo).
+- **Vacío de datos señalado, no corregido:** no hay columna `user_id` real en `movimientos_stock`, así que el reporte no puede mostrar quién generó cada movimiento. Además, hoy en datos reales solo existen movimientos con `motivo IN ('Compra','Venta')` — `Devolucion` y `Ajuste` son valores válidos en el enum pero nunca se generan (`DevolucionController` está vacío — `PEND-02` — y `LoteController::bulkUpdate()` no crea `MovimientoStock` — `PEND-06`). El reporte los soporta igual, por si se implementan más adelante.
+- **Pruebas:** `tests/Feature/ReporteMovimientosTest.php` (Pest, 18 casos).
+
+**Cambio transversal:** los helpers de prueba (`crearUsuarioDePrueba`, `crearProductoDePrueba`, `crearLoteDePrueba`) se movieron de `ReporteVencimientosTest.php` a `tests/Pest.php` para compartirlos entre los archivos de test de Reportes sin duplicar código (y sin colisión de nombres de función entre archivos, que habría roto la suite). Los helpers específicos de compras, ventas y movimientos quedaron locales en sus respectivos archivos de test — no hubo duplicación real entre ellos, así que centralizarlos habría sido una abstracción prematura.
+
+Detalle completo de las seis sesiones en `docs/diario_desarrollo.md` (entradas 2026-07-10 y 2026-07-12). Módulo de Reportes (`AUS-01`) completo: 6/6 reportes implementados y verificados.
 
 ---
 
-### AUS-02 — Vista de Movimientos de Stock
+### AUS-02 — Vista de Movimientos de Stock ✅ RESUELTO POR CONSOLIDACIÓN (2026-07-12)
 
-La tabla `movimientos_stock` se llena correctamente para todas las compras y ventas, pero no hay ninguna pantalla en el sistema que permita consultarla.
+La tabla `movimientos_stock` se llena correctamente para todas las compras y ventas, pero no había ninguna pantalla en el sistema que permitiera consultarla.
 
-**Trabajo pendiente:**
-- Crear una vista que muestre el historial de movimientos con filtros por lote, producto, tipo (Entrada/Salida), fecha.
-- Crear una ruta protegida con un permiso apropiado.
-- Corregir previamente el bug BUG-06 (scopes de salidas/entradas).
+**No se implementó como pantalla independiente.** Al analizar el Reporte 6 de `AUS-01` ("Historial de movimientos de stock por producto o lote"), se determinó que `AUS-01` y `AUS-02` describen exactamente la misma funcionalidad (mismo dato, mismos filtros: lote, producto, tipo, fecha) — `AUS-02` se había escrito en la auditoría original (2026-07-01), antes de que existiera el módulo de Reportes (diseñado el 2026-07-10). Construir las dos por separado habría duplicado consulta, filtros y vista sin ningún beneficio.
+
+**Resuelto por consolidación, no por omisión:** la funcionalidad que pedía `AUS-02` (vista + filtros + ruta protegida) está implementada como el Reporte 6 de `AUS-01` — ver el detalle completo ahí (`GET /reportes/movimientos`, permiso `reportes.ver`). El requisito *"corregir previamente `BUG-06`"* no fue necesario: se filtra por la columna `tipo` directamente (correctamente poblada por `CompraController`/`VentaController`) en vez de depender de los scopes rotos — `BUG-06` sigue sin corregirse, deliberadamente fuera de alcance.
 
 ---
 
@@ -353,14 +412,15 @@ El sidebar de `app.blade.php` no tiene un enlace al módulo de compras. Para acc
 | **Crítica** | ~~BUG-03~~ | ~~Ruta `/lotes` causa error 500~~ ✅ 2026-07-07 |
 | **Crítica** | ~~BUG-07~~ | ~~Rutas de permisos sin autenticación~~ ✅ 2026-07-10 |
 | **Crítica** | ~~BUG-08~~ | ~~`User::esAdmin()` devolvía `true` para cualquier usuario (RBAC anulado)~~ ✅ 2026-07-10 |
+| **Alta** | ~~BUG-09~~ | ~~`MovimientoStock` no podía consultarse (`ESQ-05`)~~ ✅ 2026-07-12 |
 | **Alta** | BUG-02 | No se puede editar el precio de un producto |
 | **Alta** | ~~BUG-04~~ | ~~Ventas pueden despachar lotes vencidos~~ ✅ 2026-07-07 |
 | **Alta** | ~~BUG-05~~ | ~~Registro público de usuarios puede fallar~~ ✅ 2026-07-07 |
 | **Alta** | PEND-01 | Implementar recibos completamente |
 | **Alta** | PEND-02 | Implementar devoluciones completamente |
 | **Media** | PEND-03 | Anulación de ventas |
-| **Media** | AUS-01 | Módulo de reportes 🔶 en progreso — "Lotes próximos a vencer", "Stock valorizado" y "Productos con stock bajo" ✅ 2026-07-10 |
-| **Media** | AUS-02 | Vista de movimientos de stock |
+| **Media** | ~~AUS-01~~ | ~~Módulo de reportes~~ ✅ 6/6 reportes — completado 2026-07-12 |
+| **Media** | ~~AUS-02~~ | ~~Vista de movimientos de stock~~ ✅ resuelto por consolidación con `AUS-01` (Reporte 6) — 2026-07-12 |
 | **Media** | PEND-05 | Dashboard con datos reales y alertas |
 | **Baja** | BUG-06 | Scopes de movimientos de stock |
 | **Baja** | PEND-04 | Anulación de compras |
@@ -368,7 +428,7 @@ El sidebar de `app.blade.php` no tiene un enlace al módulo de compras. Para acc
 | **Baja** | AUS-03 | Gestión de permisos desde UI |
 | **Baja** | AUS-04 | Enlace de compras en el sidebar |
 | **Baja** | DATA-01 | Rol "Supervisor 1" sin `proveedors.ver`/`proveedors.eliminar` |
-| **Baja** | ESQ-01 a ESQ-08 | Desajustes modelo/migración |
+| **Baja** | ESQ-01 a ESQ-08 (excepto ~~ESQ-05~~ ✅) | Desajustes modelo/migración |
 
 ---
 
@@ -443,22 +503,21 @@ Resolverlos en la misma sesión ya que ambos afectan el módulo de permisos y pr
 
 ---
 
-### Sprint 3 — Decisión técnica sobre `MovimientoStock`
+### Sprint 3 — Decisión técnica sobre `MovimientoStock` ✅ RESUELTO (2026-07-12)
 
-Este ítem requiere una decisión de diseño antes de aplicar cualquier corrección de código.
-
-- **C-06 · ERR-03 — Revisar si `MovimientoStock` debe conservar `SoftDeletes`**
+- [x] **C-06 · ERR-03 — Revisar si `MovimientoStock` debe conservar `SoftDeletes`**
   El modelo usa el trait `SoftDeletes` pero la migración no tiene columna `deleted_at`.
   Esto hace que cualquier SELECT sobre la tabla falle con error SQL de columna inexistente.
-  Actualmente no hay UI que lea esta tabla, por lo que el error es latente.
+  En su momento se registró como latente ("no hay UI que lea esta tabla"); dejó de serlo
+  al implementar el Reporte 6 de `AUS-01` ("Historial de movimientos de stock"), que sí
+  necesita leerla — el bloqueo real forzó a tomar esta decisión.
 
-  Antes de corregir, decidir:
-  - **Opción A — Conservar SoftDeletes:** crear una nueva migración que añada
-    `$table->softDeletes()` a `movimientos_stock`. Apropiado si se quiere poder
-    eliminar movimientos de auditoría de forma reversible.
-  - **Opción B — Eliminar el trait:** quitar `use SoftDeletes` del modelo y dejar
-    solo hard deletes. Apropiado si los movimientos de stock son un log inmutable
-    (que es la semántica habitual de una tabla de auditoría).
+  Opciones evaluadas:
+  - **Opción A — Conservar SoftDeletes:** migración nueva con `$table->softDeletes()`.
+  - **Opción B — Eliminar el trait:** sin migración, hard deletes (ninguno usado hoy).
 
-  La Opción B es la más coherente con el diseño actual (los movimientos son trazabilidad,
-  no datos operativos) y no requiere migración. Confirmar con el tutor si aplica.
+  **Decisión tomada: Opción B.** Se confirmó por búsqueda exhaustiva que ningún punto del
+  código llama a `->delete()`/`->restore()`/`->withTrashed()` sobre `MovimientoStock`, y que
+  el diseño ya acordado para `PEND-03` (anulación de ventas) contempla movimientos
+  compensatorios, no eliminar los originales — coherente con tratar la tabla como un log
+  de auditoría inmutable. Corregido y documentado como `BUG-09` (ver más arriba).

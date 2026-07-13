@@ -379,3 +379,125 @@ Se plantearon dos decisiones de negocio no definidas y se esperó aprobación ex
 Tres de los seis reportes de `AUS-01` completados y verificados. Pendiente, en el orden propuesto: Compras por período, Ventas por período, Historial de movimientos de stock.
 
 ---
+
+## 2026-07-12 — Reporte 4: "Compras por período"
+
+### Análisis previo (sin código)
+
+Se revisaron, sin volver a auditar el proyecto completo, `Compra`, `DetalleCompra`, `Proveedor`, `CompraController` y las migraciones de `compras`/`detalles_compra`. Hallazgos relevantes:
+- `Compra::getTotalAttribute()` existe pero suma en PHP sobre `$this->detalles` cargados — adecuado para una compra individual, no para un listado paginado de muchas (N+1/cálculo en memoria). Se decidió no reutilizarlo, calculando el total en SQL como ya se hizo en "Stock valorizado".
+- `ESQ-04` (ya documentado): `Compra` tiene `estado` en `$fillable` pero la migración no tiene esa columna — no hay concepto de "compra anulada" persistido, así que el reporte no filtra por estado (no hay nada que filtrar).
+- `proveedor_id` nunca es nulo en `compras` (a diferencia de `ventas.cliente_id`), y `compras.fecha` es `datetime` (se filtra con `whereDate`, igual que los scopes de `Lote`).
+- No existe ningún "período por defecto" configurado en el sistema (a diferencia de `dias_alerta_vencimiento`). Se preguntó explícitamente al usuario si el reporte debía tener un período por defecto (p. ej. mes actual) o mostrar todas las compras sin fechas — se prefirió lo segundo, para no ocultar información sin que el usuario lo note.
+
+Se confirmó el nivel de agregación (una fila por compra, no por detalle) y las columnas (fecha, proveedor, usuario, ítems, total), siguiendo el mismo patrón de listado que `compras/index.blade.php`.
+
+### Implementación
+
+- **`app/Http/Controllers/ReporteController.php`:** nuevo método `compras()`. Filtros `desde`/`hasta` (ambos opcionales, sin default — reutilizando `fechaValida()` desde el diseño, no como fix posterior) y `proveedor_id`. Total por compra vía subquery correlacionada (`SUM(cantidad * costo_unitario)` sobre `detalles_compra`), total general vía `JOIN` + `SUM` agregado sobre todas las compras filtradas (una sola consulta, no sumando página por página). Se evitó deliberadamente `HAVING`/`GROUP BY` sobre un alias, aplicando la lección de portabilidad MySQL/SQLite del Reporte 3.
+- **`routes/web.php`:** `GET /reportes/compras` (`reportes.compras`), mismo grupo y permiso.
+- **`resources/views/reportes/compras.blade.php`** (nueva) y **`resources/views/reportes/index.blade.php`** (modificada, cuarto enlace): mismo patrón que los reportes anteriores.
+- **`tests/Feature/ReporteComprasTest.php`** (nuevo): helpers propios (`crearProveedorDePrueba`, `crearCompraDePrueba`, `agregarDetalleCompraDePrueba`) definidos localmente por ahora — se centralizarán en `tests/Pest.php` si un futuro reporte los vuelve a necesitar, siguiendo el mismo criterio ya aplicado con los helpers de producto/lote.
+
+### Verificación
+
+- `tests/Feature/ReporteComprasTest.php`: 16 casos (rango de fechas, sin fechas trae todo, filtro por proveedor, total por compra, total general sobre todo el conjunto filtrado —no solo la página—, fecha inválida, rango invertido, filtros persistentes, mensaje amigable, paginación fuera de rango, orden descendente, índice con los 4 reportes, permisos). Todos pasan.
+- Suite completa: 68 passed, 1 fallo preexistente y no relacionado (`ExampleTest`).
+- Verificación contra la base de datos real (`farmacia_tfg`): no hay compras reales todavía (`0` filas en `compras`/`detalles_compra`), así que el reporte correctamente muestra 0 resultados por defecto. Se verificó el comportamiento con datos temporales en una transacción revertida: 2 compras de un mismo proveedor (una reciente, una de hace 40 días) — con filtro de los últimos 10 días trae solo la reciente (total 50.00), sin filtro trae ambas (total 90.00); `PermisoMiddleware` bloquea correctamente a `vendedor@farmacia.com`; las rutas `/reportes` y `/reportes/compras` responden `200` en una petición real de extremo a extremo con el kernel HTTP completo. Sin residuos en la BD.
+
+### Documentación actualizada
+
+`docs/pendientes.md`: `AUS-01` actualizado con el detalle del Reporte 4, tabla de priorización actualizada (4/6 reportes).
+
+### Estado al cierre
+
+Cuatro de los seis reportes de `AUS-01` completados y verificados. Pendiente: Ventas por período (con la limitación de datos del descuento no persistido, ya documentada en el análisis inicial del módulo — entrada 2026-07-10), Historial de movimientos de stock (a decidir su solapamiento con `AUS-02`).
+
+---
+
+## 2026-07-12 (continuación) — Reporte 5: "Ventas por período"
+
+### Análisis previo (sin código)
+
+Se revisaron, sin volver a auditar el proyecto completo, `Venta`, `DetalleVenta`, `Cliente`, `VentaController` y `ventas/index.blade.php`. Se confirmó la limitación de datos ya conocida (descuento no persistido) y se explicó su efecto exacto sobre este reporte específicamente: el total solo puede reconstruirse como bruto desde `detalles_venta` (`SUM(cantidad × precio_unitario)`), igual que ya hace `ventas/index.blade.php` hoy vía `Venta::getTotalAttribute()` — no es una limitación nueva introducida por el reporte, es la misma que ya tiene el sistema en todos lados donde se muestra un total de venta.
+
+Se detectó un hallazgo nuevo relevante para el diseño de columnas: en `VentaController::store()`, un mismo producto puede generar varios `DetalleVenta` si el FIFO tomó stock de más de un lote. Por eso se decidió mostrar "unidades vendidas" como `SUM(detalles_venta.cantidad)` en vez de `COUNT(*)` de filas (que habría contado de más por el split de lotes, algo que no ocurre igual en `detalles_compra`).
+
+El usuario aprobó el plan con estas decisiones explícitas: filtros exactamente los de `AUS-01` (fecha, usuario, cliente, sin agregar estado como filtro — solo como columna informativa, para no adelantar `PEND-03`); sin período por defecto (mismo criterio que "Compras"); nota visible en la vista sobre la limitación del descuento; reutilizar `fechaValida()`; sin tocar el módulo de Ventas ni el esquema de la BD.
+
+### Implementación
+
+- **`app/Http/Controllers/ReporteController.php`:** nuevo método `ventas()`. Mismo patrón exacto que `compras()`: filtros `desde`/`hasta` (vía `fechaValida()`, sin default), `user_id`, `cliente_id`; total por venta y total general calculados en SQL con subqueries correlacionadas y un `JOIN`+`SUM` agregado respectivamente (sin `HAVING`/`GROUP BY` sobre alias); orden por fecha descendente.
+- **`routes/web.php`:** `GET /reportes/ventas` (`reportes.ventas`), mismo grupo y permiso.
+- **`resources/views/reportes/ventas.blade.php`** (nueva) y **`resources/views/reportes/index.blade.php`** (modificada, quinto enlace): mismo patrón que los reportes anteriores. Se agregó una nota visible explicando la limitación del total bruto, y la columna se etiquetó "Total (bruto)".
+- **`tests/Feature/ReporteVentasTest.php`** (nuevo): helpers propios (`crearClienteDePrueba`, `crearVentaDePrueba`, `agregarDetalleVentaDePrueba`) locales, sin centralizar en `Pest.php` — no hay duplicación real con los helpers de compras (modelos y reglas distintas).
+
+### Verificación
+
+- `tests/Feature/ReporteVentasTest.php`: 20 casos (rango de fechas, sin fechas trae todo, filtro por usuario, filtro por cliente, venta sin cliente/público general, unidades vendidas correctas pese al split de lotes por FIFO —caso dedicado—, total bruto por venta, total general sobre todo el conjunto filtrado, fecha inválida, rango invertido, filtros persistentes, mensaje amigable, paginación fuera de rango, orden descendente, estado como columna informativa, índice con los 5 reportes, permisos). Todos pasan.
+- Suite completa: 88 passed, 1 fallo preexistente y no relacionado (`ExampleTest`).
+- Verificación contra la base de datos real (`farmacia_tfg`): existe 1 venta real (10 unidades, total bruto 125.00, cliente "Público general", usuario "Cristiano", estado "confirmada") — el reporte la muestra correctamente. Con un filtro de fecha que la excluye (`desde=2026-07-01`), el reporte correctamente devuelve 0 resultados y total 0.00. `PermisoMiddleware` bloquea a `vendedor@farmacia.com`; `/reportes` y `/reportes/ventas` responden `200` en una petición real de extremo a extremo con el kernel HTTP completo. Sin mutación de datos reales.
+
+### Documentación actualizada
+
+`docs/pendientes.md`: `AUS-01` actualizado con el detalle del Reporte 5, incluyendo la limitación del descuento documentada explícitamente para este reporte, y tabla de priorización actualizada (5/6 reportes).
+
+### Estado al cierre
+
+Cinco de los seis reportes de `AUS-01` completados y verificados. Pendiente, único reporte que falta: Historial de movimientos de stock (a decidir su solapamiento con `AUS-02`).
+
+---
+
+## 2026-07-12 (continuación) — Reporte 6: "Historial de movimientos de stock" — consolidación de AUS-01/AUS-02 y corrección de bug bloqueante (ESQ-05 → BUG-09)
+
+### Análisis previo (sin código)
+
+Se revisaron, sin volver a auditar el proyecto completo, `MovimientoStock`, `Lote`, `Producto`, `Compra`, `Venta`, `Devolucion`/`DevolucionController`, `LoteController::bulkUpdate()` y las secciones `AUS-01`, `AUS-02`, `BUG-06`, `PEND-06`, `ESQ-05` de `pendientes.md`.
+
+**Hallazgo central del análisis:** `AUS-01` (Reporte 6, "historial de movimientos por producto o lote") y `AUS-02` ("vista de movimientos con filtros por lote, producto, tipo, fecha") describen la misma funcionalidad — `AUS-02` se escribió en la auditoría original (2026-07-01), antes de que existiera el módulo de Reportes (2026-07-10). Se presentó el hallazgo al usuario, tal como pidió, en vez de implementar dos pantallas duplicadas. El usuario confirmó consolidar ambos en una sola implementación dentro de la estructura de Reportes ya existente, y marcar `AUS-02` como resuelto por esa misma implementación (no eliminado por descuido).
+
+Se confirmó también que `MovimientoStock::user()` y `MovimientoStock::referencia()` (relación `morphTo`) están rotas — referencian `user_id`/`referencia_tipo`/`referencia_id`, columnas inexistentes en la migración —, y que `BUG-06` (scopes `entradas()`/`salidas()` basados en el signo de `cantidad`, siempre positivo) no haría falta corregirlo si se filtra por la columna `tipo` directamente (correctamente poblada por `CompraController`/`VentaController`).
+
+Filtros acordados: producto, lote, tipo, rango de fechas (los 4 que aparecen, combinados, en `AUS-01` + `AUS-02`). Sin filtro de `motivo` (no pedido por ningún backlog, decisión explícita de no ampliar el alcance).
+
+### Bloqueo descubierto durante la implementación: `ESQ-05`
+
+Al escribir la primera consulta de prueba (`MovimientoStock::count()`), la petición falló con un error SQL real, tanto en SQLite como en MySQL (`farmacia_tfg`):
+
+```
+SQLSTATE[42S22]: Column not found: 1054 Unknown column 'movimientos_stock.deleted_at' in 'where clause'
+```
+
+Causa: `MovimientoStock` usa `SoftDeletes`, que aplica un global scope a **toda** consulta `SELECT`; la tabla nunca tuvo la columna `deleted_at`. Ya estaba catalogado como `ESQ-05`, con la nota *"no hay UI que lea esta tabla, por lo que el error es latente"* — nota que dejó de ser cierta al construir la primera pantalla que sí la lee. Se confirmó también por qué nunca se había notado: el scope solo afecta lecturas, y `CompraController`/`VentaController` solo escriben (`::create()`), nunca leen.
+
+Siguiendo la instrucción explícita del usuario ("no escribas soluciones alternativas para evitar el problema, detente y consúltame"), se pausó la implementación y se presentó un análisis completo (causa exacta, alternativas, recomendación, archivos, efectos secundarios, impacto en datos existentes) **sin escribir código**, antes de continuar.
+
+### Decisión y corrección (BUG-09)
+
+El usuario aprobó la Opción B (quitar el trait `SoftDeletes`), tratada explícitamente como *"bug previo necesario para desbloquear el sprint"*, no como ampliación del alcance del Reporte 6. Se confirmó por búsqueda exhaustiva en `app/` que ningún punto del código llama a `->delete()`/`->restore()`/`->withTrashed()`/`->onlyTrashed()` sobre `MovimientoStock`, y que se confirmó en la BD real que solo existía **1 fila** en la tabla antes del cambio (sin riesgo de pérdida de datos).
+
+Único cambio: se quitó `use SoftDeletes;` (y su import) de `app/Models/MovimientoStock.php`. Sin migraciones, sin cambios de esquema, sin tocar `Compra`, `Venta`, `Devolucion`, `CompraController` ni `VentaController`.
+
+### Implementación del Reporte 6
+
+- **`app/Http/Controllers/ReporteController.php`:** nuevo método `movimientos()`. Sin agregación (`SUM`/`COUNT`) — es el único de los 6 reportes que no la necesita, así que no hereda el riesgo de portabilidad MySQL/SQLite de los reportes 3-5. Filtros `producto_id` (vía `whereHas('lote', ...)`), `lote_id`, `tipo` (whitelist `Entrada`/`Salida`, cualquier otro valor se ignora) y `desde`/`hasta` (vía `fechaValida()`, sin período por defecto). Orden por fecha descendente. No usa `MovimientoStock::user()` ni `::referencia()`; el campo `referencia` se muestra tal cual.
+- **`routes/web.php`:** `GET /reportes/movimientos` (`reportes.movimientos`), mismo grupo y permiso.
+- **`resources/views/reportes/movimientos.blade.php`** (nueva) y **`resources/views/reportes/index.blade.php`** (modificada, sexto y último enlace): mismo patrón que los reportes anteriores.
+- **`tests/Feature/ReporteMovimientosTest.php`** (nuevo): helper propio (`crearMovimientoDePrueba`) local, reutilizando `crearProductoDePrueba`/`crearLoteDePrueba` de `tests/Pest.php`.
+
+### Verificación
+
+- Tras el fix de `MovimientoStock`: `MovimientoStock::count()`/`::query()->get()` funcionan correctamente contra MySQL real (antes fallaban). `tests/Feature/ReporteMovimientosTest.php`: 18 casos (tipo Entrada/Salida, filtro por producto, filtro por lote, rango de fechas, sin fechas trae todo, fecha inválida, rango invertido, campo `referencia` sin relaciones rotas, filtros persistentes, mensaje amigable, paginación fuera de rango, orden descendente, tipo inválido ignorado, índice con los 6 reportes, permisos). Todos pasan.
+- Se verificó, en una transacción revertida, que `CompraController`/`VentaController` siguen creando `MovimientoStock` de forma idéntica a antes del fix (las escrituras nunca dependieron del trait) — 2 movimientos de prueba creados sin problema, revertidos sin residuos.
+- Suite completa: 106 passed, 1 fallo preexistente y no relacionado (`ExampleTest`).
+- Verificación contra la base de datos real (`farmacia_tfg`): el único movimiento real (`Salida`, `Venta`, 10 unidades, lote `P002-L1`, producto Amoxicilina) se muestra correctamente; `PermisoMiddleware` bloquea a `vendedor@farmacia.com`; `/reportes` y `/reportes/movimientos` responden `200` en una petición real de extremo a extremo con el kernel HTTP completo.
+
+### Documentación actualizada
+
+`docs/pendientes.md`: nuevo `BUG-09` en el catálogo de bugs (corregido, con causa, alternativas evaluadas, decisión e impacto en datos), `ESQ-05` marcado resuelto con referencia a `BUG-09`, "Sprint 3" histórico marcado como resuelto, `AUS-01` marcado **completo (6/6 reportes)**, `AUS-02` marcado **resuelto por consolidación** con referencia cruzada explícita al Reporte 6 (para dejar constancia de que no se eliminó por olvido), y tabla de priorización actualizada.
+
+### Estado al cierre
+
+**Módulo de Reportes (`AUS-01`) completo: 6/6 reportes implementados y verificados** (Lotes próximos a vencer, Stock valorizado, Productos con stock bajo, Compras por período, Ventas por período, Historial de movimientos de stock). `AUS-02` resuelto por consolidación. Deuda técnica pendiente, fuera de este sprint: `BUG-02`, `BUG-06`, `PEND-01` a `PEND-06`, `DATA-01`, `AUS-03`, `AUS-04`, `ESQ-01` a `ESQ-04`/`ESQ-06` a `ESQ-08`, y la deuda del umbral de stock bajo hardcodeado en el dashboard (anotada en el sprint del Reporte 3).
+
+---

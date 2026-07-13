@@ -132,6 +132,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/vencimientos', [ReporteController::class, 'vencimientos'])->name('vencimientos');
         Route::get('/stock-valorizado', [ReporteController::class, 'stockValorizado'])->name('stockValorizado');
         Route::get('/stock-bajo', [ReporteController::class, 'stockBajo'])->name('stockBajo');
+        Route::get('/compras', [ReporteController::class, 'compras'])->name('compras');
+        Route::get('/ventas', [ReporteController::class, 'ventas'])->name('ventas');
+        Route::get('/movimientos', [ReporteController::class, 'movimientos'])->name('movimientos');
     });
 });
 
