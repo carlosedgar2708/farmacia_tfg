@@ -51,10 +51,12 @@ test('producto con un lote vencido y otro proximo aparece una sola vez como VENC
     crearLote($producto, 'L-PROXIMO', now()->addDays(10)->toDateString(), 10);
 
     $response = $this->actingAs($this->user)->get('/inicio');
-    $proximos = $response->viewData('proximosVencer');
+    $vencidos = $response->viewData('vencidos');
+    $proximos = $response->viewData('proximosAVencer');
 
-    $delProducto = $proximos->where('id', $producto->id);
+    $delProducto = $vencidos->where('id', $producto->id);
 
+    expect($proximos->where('id', $producto->id))->toHaveCount(0);
     expect($delProducto)->toHaveCount(1);
     expect($delProducto->first()->estado_vencimiento)->toBe('vencido');
     expect($delProducto->first()->lote_relevante->nro_lote)->toBe('L-VENCIDO');
@@ -67,7 +69,7 @@ test('producto con varios lotes proximos a vencer muestra solo el mas proximo', 
     crearLote($producto, 'L-MEDIO', now()->addDays(40)->toDateString(), 10);
 
     $response = $this->actingAs($this->user)->get('/inicio');
-    $proximos = $response->viewData('proximosVencer');
+    $proximos = $response->viewData('proximosAVencer');
 
     $delProducto = $proximos->where('id', $producto->id);
 
@@ -82,7 +84,7 @@ test('producto con lote vencido sin stock y lote vigente proximo no se marca com
     crearLote($producto, 'L-VIGENTE-PROXIMO', now()->addDays(10)->toDateString(), 10);
 
     $response = $this->actingAs($this->user)->get('/inicio');
-    $proximos = $response->viewData('proximosVencer');
+    $proximos = $response->viewData('proximosAVencer');
 
     $delProducto = $proximos->where('id', $producto->id);
 
@@ -97,8 +99,10 @@ test('producto sin alertas no aparece en el widget', function () {
     crearLote($producto, 'L-SIN-FECHA', null, 10);
 
     $response = $this->actingAs($this->user)->get('/inicio');
-    $proximos = $response->viewData('proximosVencer');
+    $vencidos = $response->viewData('vencidos');
+    $proximos = $response->viewData('proximosAVencer');
 
+    expect($vencidos->pluck('id'))->not->toContain($producto->id);
     expect($proximos->pluck('id'))->not->toContain($producto->id);
 });
 
@@ -108,9 +112,9 @@ test('cambiar dias_alerta_vencimiento actualiza inmediatamente el dashboard', fu
 
     Configuracion::establecer('dias_alerta_vencimiento', 30);
     $response1 = $this->actingAs($this->user)->get('/inicio');
-    expect($response1->viewData('proximosVencer')->pluck('id'))->not->toContain($producto->id);
+    expect($response1->viewData('proximosAVencer')->pluck('id'))->not->toContain($producto->id);
 
     Configuracion::establecer('dias_alerta_vencimiento', 60);
     $response2 = $this->actingAs($this->user)->get('/inicio');
-    expect($response2->viewData('proximosVencer')->pluck('id'))->toContain($producto->id);
+    expect($response2->viewData('proximosAVencer')->pluck('id'))->toContain($producto->id);
 });

@@ -3,16 +3,14 @@
 
 @section('content')
 <div class="page">
-  <div class="card">
+  <x-card>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <h2>Compras</h2>
-      <a href="{{ route('compras.create') }}" class="btn primary">
-        + Nueva compra
-      </a>
+      <x-button variant="primary" icon="ri-add-circle-line" href="{{ route('compras.create') }}">Nueva compra</x-button>
     </div>
 
     @if(session('success'))
-      <div class="alert alert-success">{{ session('success') }}</div>
+      <x-alert variant="success">{{ session('success') }}</x-alert>
     @endif
 
     <div class="tabla-box soft">
@@ -37,7 +35,9 @@
             </tr>
           @empty
             <tr>
-              <td colspan="5" style="text-align:center;color:#888">No hay compras registradas</td>
+              <td colspan="5">
+                <x-empty-state message="No hay compras registradas." />
+              </td>
             </tr>
           @endforelse
         </tbody>
@@ -47,6 +47,6 @@
     <div style="margin-top:10px">
       {{ $compras->links() }}
     </div>
-  </div>
+  </x-card>
 </div>
 @endsection

@@ -3,248 +3,129 @@
 @section('title', 'Inicio')
 
 @section('content')
-<section class="panel" style="background:none; box-shadow:none;padding:0;">
 
-    <h1 class="h-top">Inicio</h1>
-    <p>Resumen general del sistema.</p>
-
-    {{-- ====== TARJETAS SUPERIORES ====== --}}
-    <div class="dashboard-cards">
-        <div class="dash-card">
-            <span class="label">USUARIOS</span>
-            <span class="value">{{ $stats['usuarios'] }}</span>
+    {{-- ======= 1. QUÉ PASÓ HOY ======= --}}
+    <x-card title="Qué pasó hoy" icon="ri-calendar-check-line">
+        <div class="info-list">
+            <div class="info-item">
+                <div class="left">
+                    <div class="title">Ventas de hoy</div>
+                    <div class="sub">{{ $ventasHoy['cantidad'] }} {{ Str::plural('venta', $ventasHoy['cantidad']) }}</div>
+                </div>
+                <span class="money">Bs. {{ number_format($ventasHoy['monto'], 2) }}</span>
+            </div>
+            <div class="info-item">
+                <div class="left">
+                    <div class="title">Compras de hoy</div>
+                    <div class="sub">{{ $comprasHoy['cantidad'] }} {{ Str::plural('compra', $comprasHoy['cantidad']) }}</div>
+                </div>
+                <span class="money">Bs. {{ number_format($comprasHoy['monto'], 2) }}</span>
+            </div>
         </div>
+    </x-card>
 
-        <div class="dash-card">
-            <span class="label">ROLES</span>
-            <span class="value">{{ $stats['roles'] }}</span>
-        </div>
+    {{-- ======= 2. ALERTAS CRÍTICAS ======= --}}
+    <x-card title="Alertas críticas" icon="ri-alarm-warning-line">
 
-        <div class="dash-card">
-            <span class="label">PROVEEDORES</span>
-            <span class="value">{{ $stats['proveedors'] }}</span>
-        </div>
-
-        <div class="dash-card">
-            <span class="label">PRODUCTOS</span>
-            <span class="value">{{ $stats['productos'] }}</span>
-        </div>
-
-        <div class="dash-card">
-            <span class="label">VENTAS HOY</span>
-            <span class="value">{{ $stats['ventasHoy'] }}</span>
-        </div>
-    </div>
-
-    {{-- ====== CONTENIDO PRINCIPAL ====== --}}
-    <div class="dashboard-grid">
-
-        {{-- ======= 1. PRODUCTOS CON MENOS STOCK ======= --}}
-        <div class="info-box">
-        <h3>📉 Productos con menos stock</h3>
-        <p class="small-note">Los que estén con <b>menos de 30</b> deben mostrarse en rojo.</p>
-
-        @if(($productosMenosStock ?? collect())->isEmpty())
-            <div class="empty-box">Sin datos aún.</div>
+        <div class="sb-section">Vencidos</div>
+        @if($vencidos->isEmpty())
+            <x-empty-state compact icon="ri-checkbox-circle-line" message="No hay productos vencidos." />
         @else
             <div class="info-list">
-            @foreach($productosMenosStock as $p)
-                @php $low = (int)$p->stock_total < 30; @endphp
-                <div class="info-item">
-                <div class="left">
-                    <div class="title {{ $low ? 'text-danger' : '' }}">
-                    {{ $p->nombre }}
+                @foreach($vencidos as $p)
+                    <div class="info-item">
+                        <div class="left">
+                            <div class="title">{{ $p->nombre }}</div>
+                            <div class="sub">
+                                @if($p->lote_relevante)
+                                    Lote {{ $p->lote_relevante->nro_lote }} · Venció {{ $p->lote_relevante->fecha_vencimiento }}
+                                @endif
+                            </div>
+                        </div>
+                        <x-badge variant="danger">VENCIDO</x-badge>
                     </div>
-                    <div class="sub">Stock total</div>
-                </div>
-                <span class="badge {{ $low ? 'danger' : 'ok' }}">
-                    {{ $p->stock_total }}
-                </span>
-                </div>
-            @endforeach
+                @endforeach
             </div>
         @endif
+        <x-button variant="ghost" href="{{ route('reportes.vencimientos') }}">Ver reporte completo →</x-button>
 
-        <a href="{{ route('productos.index') }}" class="btn add mt-12">Ver más →</a>
+        <div class="two mt-12">
+            <div>
+                <div class="sb-section">Próximos a vencer</div>
+                @if($proximosAVencer->isEmpty())
+                    <x-empty-state compact icon="ri-checkbox-circle-line" message="No hay productos próximos a vencer." />
+                @else
+                    <div class="info-list">
+                        @foreach($proximosAVencer as $p)
+                            <div class="info-item">
+                                <div class="left">
+                                    <div class="title">{{ $p->nombre }}</div>
+                                    <div class="sub">
+                                        @if($p->lote_relevante)
+                                            Vence {{ $p->lote_relevante->fecha_vencimiento }}
+                                        @endif
+                                    </div>
+                                </div>
+                                <x-badge variant="warn">PRÓXIMO</x-badge>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+                <x-button variant="ghost" href="{{ route('reportes.vencimientos') }}">Ver reporte completo →</x-button>
+            </div>
+
+            <div>
+                <div class="sb-section">Stock bajo</div>
+                @if($stockBajo->isEmpty())
+                    <x-empty-state compact icon="ri-checkbox-circle-line" message="No hay productos con stock bajo." />
+                @else
+                    <div class="info-list">
+                        @foreach($stockBajo as $p)
+                            <div class="info-item">
+                                <div class="left">
+                                    <div class="title">{{ $p->nombre }}</div>
+                                    <div class="sub">{{ (int) $p->stock_total }} unidades</div>
+                                </div>
+                                <x-badge :variant="$p->estado_stock === 'sin_stock' ? 'danger' : 'warn'">
+                                    {{ $p->estado_stock === 'sin_stock' ? 'SIN STOCK' : 'STOCK BAJO' }}
+                                </x-badge>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+                <x-button variant="ghost" href="{{ route('reportes.stockBajo') }}">Ver reporte completo →</x-button>
+            </div>
         </div>
+    </x-card>
 
-
-
-        {{-- ======= 2. GRAFICA (A futuro) ======= --}}
-        <div class="info-box big">
-            <h3>📊 Rendimiento del personal</h3>
-            <div class="chart-placeholder">Aquí va tu gráfico</div>
-        </div>
-
-
-        {{-- ======= 3. PRODUCTOS MÁS VENDIDOS ======= --}}
-        <div class="info-box">
-        <h3>🔥 Productos más vendidos</h3>
-        <p class="small-note">Top del mes actual.</p>
-
-        @if(($productosMasVendidos ?? collect())->isEmpty())
-            <div class="empty-box">Sin datos aún.</div>
+    {{-- ======= 3. ÚLTIMOS MOVIMIENTOS ======= --}}
+    <x-card title="Últimos movimientos" icon="ri-exchange-line">
+        @if($ultimosMovimientos->isEmpty())
+            <x-empty-state message="Todavía no hay movimientos registrados." />
         @else
             <div class="info-list">
-            @foreach($productosMasVendidos as $p)
-                <div class="info-item">
-                <div class="left">
-                    <div class="title">{{ $p->nombre }}</div>
-                    <div class="sub">Unidades vendidas</div>
-                </div>
-                <span class="badge">
-                    {{ $p->cantidad_vendida }} u
-                </span>
-                </div>
-            @endforeach
+                @foreach($ultimosMovimientos as $m)
+                    <div class="info-item">
+                        <div class="left">
+                            <div class="title">{{ $m->lote->producto->nombre ?? '—' }}</div>
+                            <div class="sub">{{ $m->fecha->format('d/m H:i') }} · Lote {{ $m->lote->nro_lote ?? '—' }} · {{ $m->motivo }}</div>
+                        </div>
+                        <x-badge :variant="$m->tipo === 'Entrada' ? 'ok' : 'warn'">{{ strtoupper($m->tipo) }}</x-badge>
+                    </div>
+                @endforeach
             </div>
         @endif
+        <x-button variant="ghost" href="{{ route('reportes.movimientos') }}">Ver historial completo →</x-button>
+    </x-card>
 
-        <a href="{{ route('ventas.index') }}" class="btn add mt-12">Ver más →</a>
+    {{-- ======= 4. ACCESOS RÁPIDOS ======= --}}
+    <x-card title="Accesos rápidos" icon="ri-flashlight-line">
+        <div class="actions">
+            <x-button variant="primary" icon="ri-shopping-bag-3-line" href="{{ route('ventas.create') }}">Nueva venta</x-button>
+            <x-button variant="secondary" icon="ri-truck-line" href="{{ route('compras.create') }}">Registrar compra</x-button>
+            <x-button variant="secondary" icon="ri-arrow-go-back-line" :disabled="true">Registrar devolución — Próximamente</x-button>
+            <x-button variant="secondary" icon="ri-capsule-line" href="{{ route('productos.index') }}">Productos</x-button>
         </div>
-
-
-        {{-- ======= 4. PRÓXIMOS A VENCER ======= --}}
-        <div class="info-box">
-        <h3>⏳ Próximos a vencer</h3>
-        <p class="small-note">Un lote vencido con stock tiene prioridad sobre cualquier otro lote del mismo producto.</p>
-
-        @if(($proximosVencer ?? collect())->isEmpty())
-            <div class="empty-box">Sin datos aún.</div>
-        @else
-            <div class="info-list">
-            @foreach($proximosVencer as $p)
-                @php $vencido = $p->estado_vencimiento === 'vencido'; @endphp
-                <div class="info-item">
-                <div class="left">
-                    <div class="title text-danger">
-                    {{ $p->nombre }}
-                    </div>
-                    <div class="sub">
-                    @if($p->lote_relevante)
-                        Lote {{ $p->lote_relevante->nro_lote }} · Vence {{ $p->lote_relevante->fecha_vencimiento }}
-                    @endif
-                    </div>
-                </div>
-                <span class="badge danger">
-                    {{ $vencido ? 'VENCIDO' : 'Vence pronto' }}
-                </span>
-                </div>
-            @endforeach
-            </div>
-        @endif
-
-        <a href="{{ route('productos.index') }}" class="btn add mt-12">Ver más →</a>
-        </div>
-
-
-    </div>
-
-</section>
-
-
-{{-- ====== ESTILOS ESPECIALES PARA ESTE DASHBOARD ====== --}}
-<style>
-.dashboard-cards{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-    gap:15px;
-    margin-bottom:20px;
-}
-.dash-card{
-    background:white;
-    border-radius:12px;
-    padding:15px;
-    box-shadow:0 2px 4px #0001;
-}
-.dash-card .label{ font-size:13px; color:#888; }
-.dash-card .value{
-    display:block; font-size:28px; font-weight:700; margin-top:5px;
-}
-
-.dashboard-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
-    gap:22px;
-}
-
-/* Box general */
-.info-box{
-    background:white;
-    border-radius:15px;
-    padding:20px;
-    box-shadow:0 4px 10px #0001;
-}
-.info-box.big{ min-height:260px; }
-.small-note{
-    font-size:13px;
-    margin-top:-5px;
-    color:#666;
-}
-.chart-placeholder{
-    height:200px;
-    background:#f2f6f9;
-    border-radius:10px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    color:#999;
-    font-size:14px;
-    margin-top:10px;
-}
-
-/* Listas */
-.info-list{
-    list-style:none;
-    padding:0;
-    margin:10px 0;
-}
-.info-list li{
-    display:flex;
-    justify-content:space-between;
-    padding:8px 0;
-    border-bottom:1px solid #eee;
-}
-.item-name{
-    font-weight:600;
-}
-.sub{
-    font-size:12px;
-    color:#888;
-}
-
-/* Badges */
-.badge{
-    padding:3px 7px;
-    border-radius:6px;
-    font-size:13px;
-}
-.badge.danger{
-    background:#ffe2e2;
-    color:#b70000;
-}
-.badge.normal{
-    background:#e4f3ff;
-    color:#0062a3;
-}
-
-/* Botón */
-.btn.more{
-    margin-top:10px;
-    padding:6px 12px;
-    background:#ff8c7b;
-    color:white;
-    border-radius:8px;
-    font-size:14px;
-    display:inline-block;
-}
-.empty-box{
-    background:#f4f6f8;
-    padding:12px;
-    border-radius:8px;
-    text-align:center;
-    color:#999;
-}
-</style>
+    </x-card>
 
 @endsection

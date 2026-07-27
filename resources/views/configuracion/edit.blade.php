@@ -21,6 +21,7 @@
           <input type="number" id="dias_alerta_vencimiento" name="dias_alerta_vencimiento"
                  value="{{ old('dias_alerta_vencimiento', $diasAlertaVencimiento) }}"
                  min="1" max="365" required>
+          @error('dias_alerta_vencimiento') <small class="field-error">{{ $message }}</small> @enderror
         </div>
 
         <button type="submit" class="btn add mt-12">Guardar</button>

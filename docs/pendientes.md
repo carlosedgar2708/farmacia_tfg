@@ -177,6 +177,37 @@ Detectado como bloqueante al implementar el Reporte 6 ("Historial de movimientos
 
 ---
 
+### BUG-10 — `auth/register.blade.php` extendía una vista inexistente ✅ CORREGIDO (2026-07-21)
+
+**Módulo:** Autenticación
+**Archivo:** `resources/views/auth/register.blade.php`
+
+Detectado durante la auditoría de `UI-04A` (estandarización de errores de validación), no relacionado con esa tarea. La vista hacía `@extends('layouts.app')`, pero `resources/views/layouts/` **no existe** en el proyecto — el layout real es `resources/views/app.blade.php`, extendido en el resto del sistema como `@extends('app')`. Con `Features::registration()` habilitado en `config/fortify.php`, cualquier visitante que abriera `GET /register` recibía una excepción (`View [layouts.app] not found`).
+
+**Corregido:** `@extends('layouts.app')` → `@extends('app')`. Se verificó primero que `app.blade.php` no asume un usuario autenticado (el bloque de navegación que sí llama `auth()->user()->esAdmin()` está envuelto en `@auth`/`@endauth`), así que el fix no cambiaba un error por otro. Como la vista pasó a heredar el shell autenticado completo (sidebar incluido, pensado para usuarios logueados), se le agregó el mismo mecanismo que ya usa `auth/login.blade.php` para ocultar el sidebar en pantallas de invitado (`body.auth` + CSS/JS locales a la vista) — sin eso, `/register` se habría visto rota dentro del sidebar en vez de fallar, un regresión distinta pero igual de real.
+
+**Verificado:** `GET /register` responde `200` (antes: excepción). Suite completa sin regresiones (`tests/Feature/FormErrorsTest.php`).
+
+---
+
+### BUG-11 — El chip de estado de Ventas nunca muestra `pagada`/`pendiente`/`anulada` — encontrado en `UI-05` (2026-07-24)
+
+**Módulo:** Ventas
+**Archivos:** `app/Http/Controllers/VentaController.php`, `resources/views/ventas/index.blade.php`
+
+**Estado:** No corregido — decisión explícita del usuario de dejarlo fuera de una migración puramente visual.
+
+`ventas/index.blade.php` mapea el campo `estado` a un color de chip:
+```php
+$map = ['pagada' => 'ok', 'pendiente' => 'warn', 'anulada' => 'bad'];
+$clase = $map[$estado] ?? 'neutral';
+```
+Pero `VentaController::store()` **siempre** guarda `'estado' => 'confirmada'` — un valor que no aparece en `$map`. En la práctica, **toda venta real cae en el fallback `neutral`**; el chip nunca muestra `ok` (pagada), `warn` (pendiente) ni `bad` (anulada) con los datos que el sistema genera hoy.
+
+**Trabajo pendiente:** decidir si `estado` debería reflejar el ciclo de vida real de una venta (pagada/pendiente/anulada) — lo cual requeriría además implementar `PEND-03` (anulación de ventas, ya documentada) — o si el mapa de colores de la vista debería ajustarse al único valor que el sistema produce actualmente (`confirmada`). Ninguna opción se implementó; es una decisión de negocio, no de presentación.
+
+---
+
 ## Problemas de Datos (asignaciones de roles/permisos, no bugs de código)
 
 ### DATA-01 — Rol "Supervisor 1" con permisos de proveedores incompletos
@@ -256,15 +287,18 @@ Estos no son bugs activos (no causan errores ahora mismo) pero causarán errores
 
 ---
 
-### PEND-05 — Dashboard con Datos Reales
+### PEND-05 — Dashboard con Datos Reales ✅ RESUELTO (2026-07-14, sprint `UI-05`)
 
-**Estado:** La vista existe, el controlador calcula algunos datos, pero el módulo es básico.
+**Estado anterior:** la vista existía, el controlador calculaba algunos datos, pero el módulo era básico (sin alertas configurables, stock bajo con umbral hardcodeado).
 
-**Trabajo pendiente:**
-- El `DashboardController` (actualmente sin rutas) tiene lógica más completa que `InicioController`. Considerar conectarlo o migrar su código al controlador activo.
-- Agregar filtros por rango de fechas.
-- Agregar alertas de stock bajo con umbral configurable — **deuda técnica anotada:** el widget "Productos con menos stock" sigue con el `30` hardcodeado en `inicio.blade.php`; el reporte "Productos con stock bajo" de `AUS-01` (2026-07-10) ya lee `Configuracion::obtener('stock_bajo_umbral', 30)`. Cuando se aborde este punto, el dashboard debe leer la misma clave para tener una única fuente de verdad.
-- Mostrar lotes próximos a vencer con columores de alerta.
+**Resuelto por la migración del Dashboard al Design System (`UI-05`):**
+- `InicioController::index()` fue reescrito para reutilizar exclusivamente lógica ya existente (scopes de modelo y el mismo SQL de `ReporteController`) en 4 bloques: qué pasó hoy (ventas/compras de hoy), alertas críticas (vencidos / próximos a vencer / stock bajo), últimos movimientos, accesos rápidos. Detalle completo en `docs/modulos.md` (sección "Módulo: Dashboard").
+- Stock bajo ahora lee `Configuracion::obtener('stock_bajo_umbral', 30)`, la misma clave que usa el reporte — ya no hay umbral hardcodeado. La única fuente de verdad quedó unificada.
+- Vencidos/próximos a vencer se muestran con badges de color (`danger`/`warn`), usando el mismo criterio ya validado en el reporte de vencimientos.
+- Filtros por rango de fechas: **descartado deliberadamente** — no forma parte del alcance de un dashboard ("centro de acción diario"); quien necesite filtrar por fecha usa los Reportes.
+- El `DashboardController` sin rutas sigue sin conectarse — se evaluó y se descartó explícitamente: `InicioController` ya cubre el mismo terreno con el patrón de reuso establecido en este proyecto, migrar el código de un controlador muerto habría ido en contra de esa disciplina. Sigue documentado como código en desuso (ver `docs/modulos.md`).
+
+**Deuda técnica:** el bloque de stock bajo del dashboard repite la subquery de `ReporteController::stockBajo()` en vez de compartir un scope (`Producto::scopeConStockBajo()` pendiente de extracción) — ver nota junto al Reporte 3 en la sección `AUS-01` más abajo. No se extrajo en este sprint para no ampliar su alcance.
 
 ---
 
@@ -275,6 +309,50 @@ Estos no son bugs activos (no causan errores ahora mismo) pero causarán errores
 **Trabajo pendiente:**
 - Agregar creación de `MovimientoStock` con `tipo='Entrada'` o `tipo='Salida'` y `motivo='Ajuste'` en `bulkUpdate()`.
 - Esto permite tener el historial completo de todos los cambios de inventario.
+
+---
+
+### PEND-07 — Vistas de Lotes duplicadas/rotas (encontrado en auditoría `UI-05`/Productos, 2026-07-14)
+
+**Estado:** No corregido — decisión explícita del usuario de dejarlo fuera del alcance de la migración de Productos.
+
+- **`productos/lotes/index.blade.php`** (alcanzable vía `GET /productos/{producto}/lotes`, `LoteController::index()`): `<h1>` y `<p>` con `style="color:white"` — texto invisible sobre fondo claro. Usa `.h-top`, clase que no existe en `public/css/style.css`. Sin buscador ni acciones de crear/editar/eliminar en la UI, aunque el controlador las soporta.
+- **`resources/views/lotes/index.blade.php`**: vista huérfana, más completa que la anterior, pero **sin ninguna ruta que la sirva** — no existe `Route::get('/lotes', ...)` en `routes/web.php`. El sidebar la referencia vía `Route::has('lotes.index')`, que siempre es `false`, por eso ese ítem del menú nunca aparece.
+- El flujo real de edición de stock no usa ninguna de las dos: pasa por el modal "Editar stock" de `productos/index.blade.php` (`LoteController::bulkUpdate`).
+
+**Trabajo pendiente:**
+1. Confirmar que `resources/views/lotes/index.blade.php` no tenga ningún consumidor externo (enlaces directos, bookmarks, integraciones) antes de eliminarla.
+2. Decidir el destino de `productos/lotes/index.blade.php`: ¿se corrige y se conserva como página independiente de gestión de lotes, o se elimina en favor del modal "Editar stock" que ya cubre el mismo flujo?
+3. Corregir la nota desactualizada que existía en `docs/modulos.md` sobre una ruta `GET /lotes` "con bug" — esa ruta ya no existe en el código.
+
+---
+
+### PEND-08 — Errores por campo y preservación de datos en formularios dinámicos ✅ RESUELTO (2026-07-24)
+
+**Problema original:** `compras/create.blade.php`, `ventas/create.blade.php` y el modal "Editar stock" de `productos/index.blade.php` arman sus filas con JavaScript y las serializan a inputs ocultos recién al enviar. Al fallar la validación, ninguna de las tres repoblaba la tabla desde `old()` — el usuario perdía todo lo cargado.
+
+**Hallazgo que amplió el alcance durante la auditoría:** `CompraController::store()` y `VentaController::store()` usaban `abort(422, "mensaje")` para errores de **regla de negocio** (lote vencido, stock insuficiente) — a diferencia de los errores de `$request->validate()`. `abort()` no dispara `withInput()`/`withErrors()`: el usuario caía en una página de error genérica, sin volver al formulario en absoluto. Se resolvió como una corrección de arquitectura del flujo de validación completo, no solo como reconstrucción visual.
+
+**Solución implementada:**
+- **`app/Support/FormRecovery.php`** (nuevo): `items($key, $lookups)` (old() enriquecido con nombres resueltos vía Eloquent, ej. `producto_id_label`), `label($key, $modelClass)` (para campos de cabecera como `proveedor_id`/`cliente_id`), `fieldErrors()` (mismos mensajes que `$errors->messages()`, sin acoplar la vista a `$errors` directamente).
+- **`CompraController`**: el `abort(422, ...)` de lote vencido → `throw ValidationException::withMessages(["items.$i.fecha_vencimiento" => "..."])`. `create()` prepara `oldItems`/`oldProveedorNombre`/`fieldErrors` con `FormRecovery`.
+- **`VentaController`**: el `abort(422, ...)` de stock insuficiente (condición esperable) → `ValidationException` atada a `items.$i.cantidad`. El segundo `abort(422, ...)` ("problema al descontar por lotes") — **matemáticamente inalcanzable** en operación correcta, dado el `lockForUpdate()` ya tomado antes de validar `$stockTotal >= $cantidadSolicitada` — se reclasificó como excepción real (`\RuntimeException`, no error de formulario).
+- **`LoteController::bulkUpdate()`**: envuelto en `DB::transaction()` (antes no lo estaba — una fila a mitad de la lista podía fallar dejando las anteriores ya guardadas); sus dos `back()->with('error', ...)` → `ValidationException` con `->redirectTo(route('productos.index', ['stock_error' => $producto->id]))`, ya que el modal de stock es compartido por todos los productos y hacía falta saber cuál era.
+- **`ProductoController::index()`**: si recibe `?stock_error={id}`, resuelve ese producto (nombre + `old('lotes')`) independientemente de si está en la página/búsqueda actual.
+- **Blade/JS (los 3 archivos):** una sola función por vista construye cada fila (`crearFilaCompra`/`crearFilaVenta`/`crearFilaLote`), reutilizada tanto para agregar filas interactivamente como para reconstruir desde `OLD_ITEMS`/`FIELD_ERRORS` (variables expuestas al JS en vez de que la vista dependa de `$errors->messages()` directo). Campos de cabecera (`proveedor_id`/`cliente_id`/`observacion`) resueltos con el patrón estático de `UI-04A` (`old()` + `@error()`).
+- `@json(..., JSON_UNESCAPED_UNICODE)` en los 3 bloques nuevos — sin esto, los acentos llegaban como `á` al HTML (funciona igual en JS, pero se prefirió el texto plano por legibilidad del código fuente).
+
+**Verificado:** 13 tests nuevos (`FormRecoveryTest`, `CompraStockRecoveryTest`, `VentaStockRecoveryTest`, `LoteStockRecoveryTest`) — incluye una prueba específica de que `bulkUpdate` ya no deja escrituras parciales. Suite completa: 182 passed, mismo único fallo preexistente no relacionado. Verificado además contra MySQL real (`tinker`, transacción revertida): el flujo completo de lote vencido lanza `ValidationException`, con el mensaje correcto y sin persistir la compra.
+
+---
+
+### PEND-09 — Extraer el código compartido de los buscadores a `<x-search-box>` (o mecanismo equivalente)
+
+**Estado:** Diferido deliberadamente — decisión explícita del usuario al cerrar `UI-06` (2026-07-24).
+
+`UI-06` unificó el HTML/CSS/JS de los 10 buscadores del sistema (5 "filtro": Productos/Clientes/Proveedores/Usuarios/Roles; 4 "selector": Compras producto/proveedor, Ventas producto/cliente), pero **cada vista sigue teniendo su propia copia** del JS de sugerencias (debounce, navegación por teclado, render de la lista, cierre al hacer clic afuera) — no hay ningún archivo ni componente compartido todavía. Ver `docs/design-system.md` §19.1 para el patrón exacto que hoy se repite 10 veces.
+
+**Trabajo pendiente:** una vez que el patrón esté validado en uso real (sin errores reportados durante un tiempo razonable), extraer el JS reutilizable — evaluando en ese momento si conviene un archivo `public/js/buscador.js` compartido, un componente Blade `<x-search-box>`, o ambos. Debe soportar los dos modos ("filtro" que navega vía GET, "selector" que llena un campo oculto) sin forzar uno a comportarse como el otro, y sin perder las 3 excepciones ya documentadas (filtrado en vivo de Clientes, "crear nuevo" embebido de Compras, badge de disponibilidad de Ventas) — ninguna de las tres debe generalizarse al resto por accidente durante la extracción.
 
 ---
 
@@ -328,7 +406,7 @@ El seeder define el permiso `reportes.ver`. El módulo se está implementando de
 - **Problema encontrado y corregido durante la implementación:** `withSum()` deja `stock_total` en `NULL` (no `0`) para productos sin ningún lote — confirmado también en `ProductoController`/`productos/index.blade.php`, que por eso hace `{{ $p->stock_total ?? 0 }}` en la vista. Filtrar directamente por `stock_total < $umbral` habría excluido justo los productos sin lotes, violando la regla de negocio de este reporte. Se probó primero con `HAVING`/`GROUP BY` sobre el alias (funciona en MySQL) pero falló en SQLite (motor de los tests: *"HAVING clause on a non-aggregate query"*) y, ajustado con `GROUP BY productos.id`, volvió a fallar en MySQL real (*"'productos.codigo' isn't in GROUP BY"*, con `ONLY_FULL_GROUP_BY`). Se resolvió reemplazando el `HAVING` por un `WHERE`/`ORDER BY` con la misma suma correlacionada expresada como subquery explícita (`COALESCE((select sum(stock) from lotes where...), 0)`), portable entre ambos motores — verificado en ambos (SQLite vía los tests, MySQL real vía `tinker` con datos temporales revertidos).
 - **Pruebas:** `tests/Feature/ReporteStockBajoTest.php` (Pest, 16 casos).
 
-**Deuda técnica anotada (no corregida en este sprint):** el widget "Productos con menos stock" del dashboard (`InicioController`/`inicio.blade.php`) sigue usando el umbral `30` hardcodeado directamente en la vista, en vez de `Configuracion::obtener('stock_bajo_umbral', 30)`. Cuando se decida hacer editable `stock_bajo_umbral` desde `/configuracion` (como ya lo es `dias_alerta_vencimiento`), el dashboard y este reporte deben leer la misma configuración para no tener dos fuentes de verdad del mismo número.
+**Deuda técnica anotada — resuelta parcialmente en `UI-05` (2026-07-14):** el bloque de stock bajo del dashboard (`InicioController`/`inicio.blade.php`) ya lee `Configuracion::obtener('stock_bajo_umbral', 30)`, la misma clave que este reporte — la fuente de verdad del umbral quedó unificada. Lo que **sigue** como deuda técnica: `InicioController` repite la misma subquery correlacionada (`COALESCE((select sum(stock) from lotes where...), 0)`) en vez de compartir un scope con este controlador. Extraer `Producto::scopeConStockBajo(int $umbral)` reutilizable por ambos queda pendiente, deliberadamente fuera de alcance de `UI-05` para no ampliarlo.
 
 **Reporte 4 — "Compras por período" (implementado):**
 - **Ruta:** `GET /reportes/compras` (nombre `reportes.compras`).
@@ -421,10 +499,15 @@ El sidebar de `app.blade.php` no tiene un enlace al módulo de compras. Para acc
 | **Media** | PEND-03 | Anulación de ventas |
 | **Media** | ~~AUS-01~~ | ~~Módulo de reportes~~ ✅ 6/6 reportes — completado 2026-07-12 |
 | **Media** | ~~AUS-02~~ | ~~Vista de movimientos de stock~~ ✅ resuelto por consolidación con `AUS-01` (Reporte 6) — 2026-07-12 |
-| **Media** | PEND-05 | Dashboard con datos reales y alertas |
+| **Media** | ~~PEND-05~~ | ~~Dashboard con datos reales y alertas~~ ✅ resuelto por migración `UI-05` — 2026-07-14 |
 | **Baja** | BUG-06 | Scopes de movimientos de stock |
 | **Baja** | PEND-04 | Anulación de compras |
 | **Baja** | PEND-06 | Auditoría en ajustes de stock |
+| **Baja** | PEND-07 | Vistas de lotes duplicadas/rotas (huérfana + bug visual) |
+| **Baja** | ~~PEND-08~~ | ~~Errores por campo en formularios dinámicos (Compras/Ventas/Lotes)~~ ✅ 2026-07-24 |
+| **Baja** | PEND-09 | Extraer JS compartido de buscadores a `<x-search-box>` u otro mecanismo |
+| **Alta** | ~~BUG-10~~ | ~~`auth/register.blade.php` extendía `layouts.app` inexistente~~ ✅ 2026-07-21 |
+| **Baja** | BUG-11 | Chip de estado de Ventas nunca refleja pagada/pendiente/anulada |
 | **Baja** | AUS-03 | Gestión de permisos desde UI |
 | **Baja** | AUS-04 | Enlace de compras en el sidebar |
 | **Baja** | DATA-01 | Rol "Supervisor 1" sin `proveedors.ver`/`proveedors.eliminar` |

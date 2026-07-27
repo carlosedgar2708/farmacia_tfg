@@ -3,9 +3,6 @@
 @section('title', 'Clientes')
 
 @section('content')
-{{-- Usa tu style.css global que ya trae .search-wrap, .sugg, .actions, .action, etc. --}}
-<link rel="stylesheet" href="{{ asset('css/style.css') }}">
-
 @php
   // Datos para sugerencias del buscador (si el controlador no envió una lista aparte, usamos la página actual)
   $suggData = $clientes->map(function($c){
@@ -18,29 +15,24 @@
   })->values();
 @endphp
 
-<section class="panel">
+<x-card>
   <h1 class="h-top">Lista de Clientes</h1>
-
-  @if(session('success'))
-    <div class="alert alert-success">{{ session('success') }}</div>
-  @elseif(session('error'))
-    <div class="alert alert-danger">{{ session('error') }}</div>
-  @endif
 
   {{-- Barra superior: buscador + nuevo cliente --}}
   <div class="toolbar" style="gap:14px;align-items:flex-start">
     {{-- Buscador con sugerencias (se mantiene formulario GET para enter/submit) --}}
     <form id="form-buscar" method="GET" action="{{ route('clientes.index') }}" style="flex:1;">
-      <div class="search-wrap xl" id="search-clients">
+      <div class="search-wrap" style="position:relative">
         <i class="ri-search-line"></i>
         <input id="q" name="q" type="text"
                placeholder="Buscar por nombre, documento o teléfono…"
                value="{{ $q }}">
+        <x-button type="submit" variant="secondary" icon="ri-filter-2-line">Buscar</x-button>
         <div id="sugg" class="sugg hidden"></div>
       </div>
     </form>
 
-    <a href="#" class="btn" id="btn-open-create">Nuevo cliente</a>
+    <x-button variant="primary" href="#" id="btn-open-create">Nuevo cliente</x-button>
   </div>
 
   {{-- Tabla --}}
@@ -93,9 +85,9 @@
       {{ $clientes->onEachSide(1)->links() }}
     </div>
   @else
-    <div class="empty">No hay clientes registrados.</div>
+    <x-empty-state message="No hay clientes registrados." />
   @endif
-</section>
+</x-card>
 
 {{-- Modal crear/editar --}}
 <div id="modal" class="modal">
@@ -109,16 +101,19 @@
 
       <label>Nombre *</label>
       <input type="text" name="nombre" id="f-nombre" required maxlength="255">
+      @error('nombre') <small class="field-error">{{ $message }}</small> @enderror
 
       <label>Documento</label>
       <input type="text" name="documento" id="f-documento" maxlength="255">
+      @error('documento') <small class="field-error">{{ $message }}</small> @enderror
 
       <label>Teléfono</label>
       <input type="text" name="telefono" id="f-telefono" maxlength="255">
+      @error('telefono') <small class="field-error">{{ $message }}</small> @enderror
 
       <div class="modal-actions">
-        <button type="button" class="btn-outline" id="btn-cancel">Cancelar</button>
-        <button type="submit" class="btn" id="btn-submit">Guardar</button>
+        <x-button type="button" variant="secondary" id="btn-cancel">Cancelar</x-button>
+        <x-button type="submit" variant="primary" id="btn-submit">Guardar</x-button>
       </div>
     </form>
   </div>
@@ -260,7 +255,7 @@
 
   // cerrar al hacer click fuera
   document.addEventListener('click', (e)=>{
-    if(!e.target.closest('#search-clients')) closeSugg();
+    if(!e.target.closest('.search-wrap')) closeSugg();
   });
 
   // Helpers: filtrado visual de tabla mientras escribe

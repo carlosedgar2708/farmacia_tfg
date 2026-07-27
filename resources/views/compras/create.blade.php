@@ -6,8 +6,7 @@
   <div class="venta-wrap">
 
     <!-- IZQUIERDA -->
-    <div class="venta-left card">
-      <h3 style="margin-bottom:10px">🧾 Registrar compra</h3>
+    <x-card class="venta-left" title="Registrar compra" icon="ri-file-list-3-line">
 
       <!-- CONTROLES -->
       <div class="top-controls grid4">
@@ -52,9 +51,7 @@
         </div>
 
         <div class="ctrl full">
-          <button id="btnAgregar" class="btn add" type="button">
-            <i class="ri-add-circle-line"></i> Agregar
-          </button>
+          <x-button type="button" variant="primary" icon="ri-add-circle-line" id="btnAgregar">Agregar</x-button>
         </div>
       </div>
 
@@ -79,46 +76,39 @@
 
       <!-- PIE -->
       <div class="footer-left">
-        <button type="button" class="btn danger" onclick="history.back()">
-          <i class="ri-close-line"></i> Cancelar compra
-        </button>
+        <x-button type="button" variant="danger" icon="ri-close-line" onclick="history.back()">Cancelar compra</x-button>
 
         <div class="total-box">
           <span>Total Bs</span>
           <strong id="totalTxt">0.00</strong>
         </div>
       </div>
-    </div>
+    </x-card>
 
     <!-- DERECHA -->
     <div class="venta-right">
       <form id="compraForm" method="POST" action="{{ route('compras.store') }}">
         @csrf
 
-        <div class="card">
-          <h3 class="card-title"><i class="ri-truck-line"></i> Datos de la compra</h3>
-
+        <x-card title="Datos de la compra" icon="ri-truck-line">
           <label>Proveedor</label>
           <div class="search-wrap" id="proveedorPicker">
             <i class="ri-user-search-line"></i>
-            <input id="buscadorProveedor" type="text" placeholder="Buscar proveedor por nombre…">
+            <input id="buscadorProveedor" type="text" placeholder="Buscar proveedor por nombre…" value="{{ $oldProveedorNombre }}">
             <div id="suggProveedor" class="sugg hidden"></div>
           </div>
-          <input type="hidden" name="proveedor_id" id="proveedor_id">
+          <input type="hidden" name="proveedor_id" id="proveedor_id" value="{{ old('proveedor_id') }}">
+          @error('proveedor_id') <small class="field-error">{{ $message }}</small> @enderror
 
           <label>Observación</label>
-          <input type="text" name="observacion" placeholder="(opcional)">
-        </div>
+          <input type="text" name="observacion" placeholder="(opcional)" value="{{ old('observacion') }}">
+        </x-card>
 
-        <div class="card">
-          <h3 class="card-title"><i class="ri-cash-line"></i> Confirmar compra</h3>
-
+        <x-card title="Confirmar compra" icon="ri-cash-line">
           <div class="total-badge" id="totalBadge">0.00</div>
 
-          <button type="submit" class="btn primary" style="width:100%;margin-top:10px">
-            <i class="ri-check-line"></i> Guardar compra
-          </button>
-        </div>
+          <x-button type="submit" variant="primary" icon="ri-check-line" style="width:100%;margin-top:10px">Guardar compra</x-button>
+        </x-card>
 
         <div id="itemsHidden"></div>
       </form>
@@ -126,16 +116,6 @@
 
   </div>
 </div>
-
-@if ($errors->any())
-  <div class="alert alert-danger" style="margin-top:12px">
-    <ul style="margin:0;padding-left:16px">
-      @foreach($errors->all() as $e)
-        <li>{{ $e }}</li>
-      @endforeach
-    </ul>
-  </div>
-@endif
 
 {{-- ================= Modal: Nuevo producto ================= --}}
 <div id="modalProducto" class="modal">
@@ -155,8 +135,8 @@
       <textarea name="description" placeholder="Descripción (opcional)"></textarea>
 
       <div class="modal-actions">
-        <button type="button" class="btn btn-outline" id="cancelProducto">Cancelar</button>
-        <button type="submit" class="btn primary">Guardar</button>
+        <x-button type="button" variant="secondary" id="cancelProducto">Cancelar</x-button>
+        <x-button type="submit" variant="primary">Guardar</x-button>
       </div>
     </form>
   </div>
@@ -175,8 +155,8 @@
       <input type="text" name="telefono" placeholder="Teléfono (opcional)">
 
       <div class="modal-actions">
-        <button type="button" class="btn btn-outline" id="cancelProveedor">Cancelar</button>
-        <button type="submit" class="btn primary">Guardar</button>
+        <x-button type="button" variant="secondary" id="cancelProveedor">Cancelar</x-button>
+        <x-button type="submit" variant="primary">Guardar</x-button>
       </div>
     </form>
   </div>
@@ -191,6 +171,10 @@
    ========================================================= */
 const PRODUCTOS   = @json($productosForJs);
 const PROVEEDORES = @json($proveedoresForJs);
+
+/* Reconstrucción tras un error de validación (PEND-08) */
+const OLD_ITEMS    = @json($oldItems, JSON_UNESCAPED_UNICODE);
+const FIELD_ERRORS = @json($fieldErrors, JSON_UNESCAPED_UNICODE);
 
 /* Helpers */
 const norm = s => (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
@@ -265,7 +249,7 @@ function renderSuggProd(list, q){
   if(!list.length){
     $suggProd.innerHTML = `
       <div class="sugg-item" id="btnNuevoProdSuggest">
-        <div class="sugg-icon">➕</div>
+        <div class="sugg-icon"><i class="ri-add-circle-line"></i></div>
         <div>
           <div class="sugg-title">Nuevo producto</div>
           <div class="sugg-sub">No existe “${q}”. Crear ahora</div>
@@ -277,7 +261,7 @@ function renderSuggProd(list, q){
 
   $suggProd.innerHTML = list.map((p,i)=>`
     <div class="sugg-item ${i===pIndex?'active':''}" data-id="${p.id}">
-      <div class="sugg-icon">📦</div>
+      <div class="sugg-icon"><i class="ri-archive-2-line"></i></div>
       <div>
         <div class="sugg-title">${p.nombre}</div>
         <div class="sugg-sub">Código: ${p.codigo}</div>
@@ -339,6 +323,35 @@ document.addEventListener('click', e=>{
 });
 
 /* =========================================================
+   CONSTRUCCIÓN DE FILA — única función usada tanto por "Agregar"
+   como por la reconstrucción desde OLD_ITEMS (PEND-08)
+   ========================================================= */
+function crearFilaCompra({productoId, nombre, nro, vence, costo, cantidad}, erroresFila = {}){
+  const idx = $tbody.children.length + 1;
+  const sub = cantidad * costo;
+  const err = campo => erroresFila[campo] ? `<small class="field-error">${erroresFila[campo][0]}</small>` : '';
+
+  const tr = document.createElement('tr');
+  tr.dataset.pid = productoId;
+  tr.dataset.nro = nro;
+  tr.dataset.vence = vence || '';
+  tr.dataset.costo = costo.toString();
+
+  tr.innerHTML = `
+    <td>${idx}</td>
+    <td><strong>${nombre}</strong>${err('producto_id')}</td>
+    <td>${nro}${err('nro_lote')}</td>
+    <td>${vence || '-'}${err('fecha_vencimiento')}</td>
+    <td><input class="in costo_unit" type="number" step="0.01" min="0" value="${money(costo)}">${err('costo_unitario')}</td>
+    <td><input class="in qty" type="number" min="1" step="1" value="${cantidad}">${err('cantidad')}</td>
+    <td class="sub">Bs ${money(sub)}</td>
+    <td><button type="button" class="btn btn-outline del"><i class="ri-delete-bin-6-line"></i></button></td>
+  `;
+
+  $tbody.appendChild(tr);
+}
+
+/* =========================================================
    AGREGAR FILA (usa productoSel)
    ========================================================= */
 function agregarFila(){
@@ -363,27 +376,7 @@ function agregarFila(){
   );
   if(dup){ alert('Ese producto/lote ya está en la compra.'); return; }
 
-  const idx = $tbody.children.length + 1;
-  const sub = cant * costo;
-
-  const tr = document.createElement('tr');
-  tr.dataset.pid = productoId;
-  tr.dataset.nro = nro;
-  tr.dataset.vence = vence;
-  tr.dataset.costo = costo.toString();
-
-  tr.innerHTML = `
-    <td>${idx}</td>
-    <td><strong>${productoSel.nombre}</strong></td>
-    <td>${nro}</td>
-    <td>${vence || '-'}</td>
-    <td><input class="in costo_unit" type="number" step="0.01" min="0" value="${money(costo)}"></td>
-    <td><input class="in qty" type="number" min="1" step="1" value="${cant}"></td>
-    <td class="sub">Bs ${money(sub)}</td>
-    <td><button type="button" class="btn btn-outline del"><i class="ri-delete-bin-6-line"></i></button></td>
-  `;
-
-  $tbody.appendChild(tr);
+  crearFilaCompra({productoId, nombre: productoSel.nombre, nro, vence, costo, cantidad: cant});
   recalcTotal();
 
   $nroLote.value='';
@@ -476,7 +469,7 @@ function renderSuggProv(list, q){
   if(!list.length){
     $suggProv.innerHTML = `
       <div class="sugg-item" id="btnNuevoProvSuggest">
-        <div class="sugg-icon">➕</div>
+        <div class="sugg-icon"><i class="ri-add-circle-line"></i></div>
         <div>
           <div class="sugg-title">Nuevo proveedor</div>
           <div class="sugg-sub">No existe “${q}”. Crear ahora</div>
@@ -488,7 +481,7 @@ function renderSuggProv(list, q){
 
   $suggProv.innerHTML = list.map((pr,i)=>`
     <div class="sugg-item ${i===prIndex?'active':''}" data-id="${pr.id}">
-      <div class="sugg-icon">🚚</div>
+      <div class="sugg-icon"><i class="ri-truck-line"></i></div>
       <div>
         <div class="sugg-title">${pr.nombre}</div>
         ${pr.telefono ? `<div class="sugg-sub">Tel: ${pr.telefono}</div>` : ``}
@@ -636,5 +629,26 @@ $formNuevoProveedor.addEventListener('submit', async (e)=>{
   $formNuevoProveedor.reset();
   cerrarModalProveedor();
 });
+
+/* =========================================================
+   RECONSTRUCCIÓN TRAS ERROR DE VALIDACIÓN (PEND-08)
+   ========================================================= */
+OLD_ITEMS.forEach((item, i) => {
+  const prefix = `items.${i}.`;
+  const erroresFila = {};
+  Object.keys(FIELD_ERRORS).forEach(key => {
+    if (key.startsWith(prefix)) erroresFila[key.slice(prefix.length)] = FIELD_ERRORS[key];
+  });
+
+  crearFilaCompra({
+    productoId: item.producto_id,
+    nombre: item.producto_id_label || '(producto no encontrado)',
+    nro: item.nro_lote,
+    vence: item.fecha_vencimiento,
+    costo: parseFloat(item.costo_unitario || 0),
+    cantidad: parseInt(item.cantidad || 0),
+  }, erroresFila);
+});
+if (OLD_ITEMS.length) recalcTotal();
 </script>
 @endpush

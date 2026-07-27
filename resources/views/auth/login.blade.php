@@ -21,16 +21,6 @@
         <p>Ingresa tus credenciales para continuar.</p>
       </div>
 
-      @if ($errors->any())
-        <div class="alert alert-danger login-alert">
-          <ul>
-            @foreach ($errors->all() as $e)
-              <li>{{ $e }}</li>
-            @endforeach
-          </ul>
-        </div>
-      @endif
-
       <form method="POST" action="{{ route('login') }}" class="login-form">
         @csrf
 
@@ -38,11 +28,13 @@
           <span class="fi"><i class="ri-mail-line"></i></span>
           <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus placeholder="Correo electrónico">
         </label>
+        @error('email') <small class="field-error">{{ $message }}</small> @enderror
 
         <label class="field">
           <span class="fi"><i class="ri-lock-2-line"></i></span>
           <input id="password" type="password" name="password" required placeholder="Contraseña">
         </label>
+        @error('password') <small class="field-error">{{ $message }}</small> @enderror
 
         <label class="remember">
           <input type="checkbox" name="remember">
@@ -133,11 +125,6 @@ body.auth .layout.eres{ grid-template-columns:1fr !important; }
   margin:0; color:var(--primary); font-weight:900; font-size:28px;
 }
 .form-head p{ margin:6px 0 18px; color:var(--muted); }
-
-.login-alert{
-  margin:0 0 12px;
-  padding:10px 12px; border-radius:12px;
-}
 
 .login-form{ display:flex; flex-direction:column; gap:14px; }
 

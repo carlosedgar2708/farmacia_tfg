@@ -3,29 +3,36 @@
 @section('title', 'Proveedors')
 
 @section('content')
-<link rel="stylesheet" href="{{ asset('css/style.css') }}">
+@php
+  // Fuente para sugerencias: la página actual (mismo patrón de fallback que productos/index.blade.php)
+  $suggData = $proveedores->map(function($p){
+    return [
+      'id'       => $p->id,
+      'nombre'   => $p->nombre,
+      'contacto' => $p->contacto,
+      'telefono' => $p->telefono,
+    ];
+  })->values();
+@endphp
 
-<section class="panel">
+<x-card>
   {{-- Título y descripción --}}
-  <h1 class="h-top" style="color:white;">Proveedores</h1>
-  <p style="color:white;">Administra los proveedores de productos.</p>
-
-  {{-- Alertas --}}
-  @if(session('success'))
-    <div class="alert alert-success">{{ session('success') }}</div>
-  @elseif(session('error'))
-    <div class="alert alert-danger">{{ session('error') }}</div>
-  @endif
+  <h1 class="h-top">Proveedores</h1>
+  <p>Administra los proveedores de productos.</p>
 
   {{-- Barra superior --}}
   <div class="toolbar">
-    <form method="GET" action="{{ route('proveedors.index') }}" class="search">
-      <input type="text" name="q" placeholder="Buscar por nombre, contacto o teléfono..." value="{{ $q }}">
-      <button type="submit">Buscar</button>
+    <form id="form-buscar" method="GET" action="{{ route('proveedors.index') }}" style="margin:0">
+      <div class="search-wrap" style="margin-bottom:12px; position:relative">
+        <i class="ri-search-line"></i>
+        <input id="q" type="text" name="q" placeholder="Buscar por nombre, contacto o teléfono…" value="{{ $q }}">
+        <x-button type="submit" variant="secondary" icon="ri-filter-2-line">Buscar</x-button>
+        <div id="sugg" class="sugg hidden"></div>
+      </div>
     </form>
 
     <div>
-      <a href="#" class="btn" id="btn-open-create">Nuevo proveedor</a>
+      <x-button variant="primary" href="#" id="btn-open-create">Nuevo proveedor</x-button>
     </div>
   </div>
 
@@ -74,9 +81,9 @@
       {{ $proveedores->onEachSide(1)->links() }}
     </div>
   @else
-    <div class="empty">No hay proveedors registrados.</div>
+    <x-empty-state message="No hay proveedores registrados." />
   @endif
-</section>
+</x-card>
 
 {{-- Modal crear/editar --}}
 <div id="modal" class="modal">
@@ -90,16 +97,19 @@
 
       <label>Nombre *</label>
       <input type="text" name="nombre" id="f-nombre" required maxlength="255">
+      @error('nombre') <small class="field-error">{{ $message }}</small> @enderror
 
       <label>Contacto</label>
       <input type="text" name="contacto" id="f-contacto" maxlength="255">
+      @error('contacto') <small class="field-error">{{ $message }}</small> @enderror
 
       <label>Teléfono</label>
       <input type="text" name="telefono" id="f-telefono" maxlength="255">
+      @error('telefono') <small class="field-error">{{ $message }}</small> @enderror
 
       <div class="modal-actions">
-        <button type="button" class="btn-outline" id="btn-cancel">Cancelar</button>
-        <button type="submit" class="btn" id="btn-submit">Guardar</button>
+        <x-button type="button" variant="secondary" id="btn-cancel">Cancelar</x-button>
+        <x-button type="submit" variant="primary" id="btn-submit">Guardar</x-button>
       </div>
     </form>
   </div>
@@ -152,6 +162,65 @@
   closeBtn?.addEventListener('click', closeModal);
   cancelBtn?.addEventListener('click', closeModal);
   window.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+})();
+</script>
+
+{{-- Script del buscador con sugerencias (mismo patrón que productos/index.blade.php) --}}
+<script>
+(function(){
+  const $q    = document.getElementById('q');
+  const $sugg = document.getElementById('sugg');
+  const $form = document.getElementById('form-buscar');
+
+  const SUGG = @json($suggData);
+
+  const norm = s => (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+
+  let items=[], idx=-1;
+
+  function close(){ $sugg.classList.add('hidden'); $sugg.innerHTML=''; items=[]; idx=-1; }
+
+  function render(list){
+    if(!list.length){ close(); return; }
+    items=list;
+    $sugg.innerHTML = list.map((p,i)=>`
+      <div class="sugg-item${i===idx?' active':''}" data-text="${p.nombre}">
+        <div class="sugg-icon"><i class="ri-truck-line"></i></div>
+        <div>
+          <div class="sugg-title">${p.nombre}</div>
+          <div class="sugg-sub">${p.contacto || '—'} &middot; ${p.telefono || '—'}</div>
+        </div>
+      </div>
+    `).join('');
+    $sugg.classList.remove('hidden');
+  }
+
+  const doSearch = ()=>{
+    const q = norm($q.value.trim());
+    if(!q){ close(); return; }
+    const results = SUGG.filter(p=> norm(p.nombre+' '+(p.contacto||'')+' '+(p.telefono||'')).includes(q)).slice(0,12);
+    render(results);
+  };
+
+  $q.addEventListener('input', doSearch);
+
+  $q.addEventListener('keydown', (e)=>{
+    if($sugg.classList.contains('hidden')) return;
+    const max = items.length-1;
+    if(e.key==='ArrowDown'){ e.preventDefault(); idx=Math.min(max,idx+1); render(items); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); idx=Math.max(0,idx-1); render(items); }
+    else if(e.key==='Enter'){
+      if(idx>=0){ e.preventDefault(); $q.value = items[idx].nombre; }
+      close(); $form.submit();
+    }else if(e.key==='Escape'){ close(); }
+  });
+
+  $sugg.addEventListener('click',(e)=>{
+    const it = e.target.closest('.sugg-item'); if(!it) return;
+    $q.value = it.dataset.text; close(); $form.submit();
+  });
+
+  document.addEventListener('click',(e)=>{ if(!e.target.closest('.search-wrap')) close(); });
 })();
 </script>
 @endsection

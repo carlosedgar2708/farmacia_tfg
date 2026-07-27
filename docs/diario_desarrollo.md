@@ -501,3 +501,707 @@ El usuario aprobó la Opción B (quitar el trait `SoftDeletes`), tratada explíc
 **Módulo de Reportes (`AUS-01`) completo: 6/6 reportes implementados y verificados** (Lotes próximos a vencer, Stock valorizado, Productos con stock bajo, Compras por período, Ventas por período, Historial de movimientos de stock). `AUS-02` resuelto por consolidación. Deuda técnica pendiente, fuera de este sprint: `BUG-02`, `BUG-06`, `PEND-01` a `PEND-06`, `DATA-01`, `AUS-03`, `AUS-04`, `ESQ-01` a `ESQ-04`/`ESQ-06` a `ESQ-08`, y la deuda del umbral de stock bajo hardcodeado en el dashboard (anotada en el sprint del Reporte 3).
 
 ---
+
+## 2026-07-13 — Sprint UI-01: Design System (documentación, sin código)
+
+Se inició una nueva línea de trabajo, independiente de `docs/pendientes.md`: el rediseño visual del sistema, planificado en 6 sprints (`UI-01` a `UI-06`) con la misma metodología ya probada en Reportes (análisis → aprobación → implementación → pruebas → documentación). `UI-01` es puramente documental — sin tocar código, CSS ni vistas.
+
+### Análisis realizado (sin modificar nada)
+
+Se revisó `public/css/style.css` completo (479 líneas), `app.blade.php`, `welcome.blade.php`, `auth/login.blade.php`, `package.json`/`vite.config.js`/`resources/css/app.css`, y se contaron los atributos `style=""` inline en todo `resources/views`. Hallazgos relevantes documentados en el informe de análisis (no en `pendientes.md`, sino como contexto de `docs/design-system.md`):
+
+- **Duplicación real de CSS:** `.card`, `.card-title`, `.search-wrap`, `.sugg*`, `.badge-ok`/`.badge-bad`, `.tabla-box.soft`, `.footer-left`, `.total-box`, `.total-badge`, `.btn.add`, `.btn.danger` están definidos 2-3 veces casi verbatim en el mismo archivo.
+- **Conflicto real (no solo duplicación):** `.table` tiene dos definiciones contradictorias de `border-spacing` (una con filas "flotantes", otra sin espacio) — la última en el archivo gana la cascada, así que el comportamiento de filas flotantes que describe el comentario original nunca se ve en pantalla. `.table thead th` tiene el mismo problema con el color de fondo.
+- **Tres sistemas de badge distintos** (`.chip-*`, `.badge-ok`/`.badge-bad`, `.badge.*`) representando los mismos estados con nombres distintos.
+- **`.alert-danger` usada en 10 vistas pero nunca definida en el CSS** — los errores de validación se renderizan hoy con el estilo `.alert` genérico (celeste/info), no como error. Bug activo, no solo inconsistencia estética.
+- **Poppins cargada solo en `welcome.blade.php`**, no en `app.blade.php` — la marca tipográfica no existe realmente en ninguna vista autenticada (el 100% del sistema real).
+- **Remix Icon cargado dos veces** en `app.blade.php` (duplicado).
+- **Tailwind CSS 4 + Vite instalados pero sin usar** en ninguna vista (cero `@vite` en todo el proyecto) — scaffolding muerto de la instalación base de Laravel.
+- **~200 atributos `style=""` inline** en 25 de 26 vistas, incluidas las 6 vistas de Reportes construidas en sprints recientes.
+- **Login con `<style>` propio embebido** (115 líneas), variables `:root` duplicadas, degradados y sombras grandes — la pantalla que más se aparta de la identidad del resto del sistema.
+
+### Decisiones de negocio/diseño consultadas antes de escribir el documento
+
+Se presentaron 3 decisiones que afectaban directamente el contenido del Design System, en vez de asumirlas:
+1. **Verde de éxito** (`--success`, no está en la paleta oficial de 5 colores) → se mantiene como excepción semántica justificada, de uso limitado a estados de éxito/disponibilidad, separada de la paleta de marca.
+2. **Página de login** (identidad visual distinta al resto del sistema) → se incluye en el rediseño, no se deja fuera de alcance.
+3. **Base técnica** (CSS plano vs. migrar a Tailwind, ya instalado pero sin usar) → se continúa con CSS plano; Tailwind queda documentado como dependencia sin uso, candidata a eliminar en `UI-06`.
+
+### Documento creado
+
+`docs/design-system.md` (22 secciones): filosofía, identidad visual, paleta oficial (azul petróleo `#357C90` identidad/marca, turquesa `#12A594` acciones principales, gris `#F5F7FA` fondos, coral `#F27D72` error/destructivo, rojo oscuro `#991B1B` uso muy limitado/crítico, verde `#C4E6B0`/`#166534` como excepción semántica), regla de severidad con un solo hue (coral en distintas intensidades + rojo oscuro como techo, para no introducir ámbar fuera de la paleta), tipografía (propuesta de cambio de Poppins a Inter, justificada), espaciado/radios/sombras en escala formal, iconografía (Remix Icon, corrección del `<link>` duplicado), especificación de botones/formularios/tablas/cards/modales/alertas/badges/colores de gráficos/responsive/accesibilidad, catálogo de componentes Blade previstos, reglas de consistencia, **checklist de 16 reglas estrictas no negociables** (sin degradados, sin glassmorphism/neumorphism, sin sombras exageradas, sin animaciones innecesarias, un solo acento por pantalla, espacio en blanco generoso, bordes 8-12px, jerarquía por tamaño/peso no por color, solo Remix Icons, máximo 2 tamaños de botón, máximo 3 niveles visuales, "todo debe sentirse ligero", una sola estructura de tabla, un solo patrón de formulario, todo componente nuevo se agrega primero al sistema — prohibido CSS específico de una vista si un componente compartido puede resolverlo), y la hoja de ruta completa `UI-01` a `UI-06` acordada con el usuario.
+
+### Estado al cierre
+
+`UI-01` completo. Nada de código, CSS ni vistas fue modificado en este sprint — es 100% documental. Pendiente: `UI-02` (propuesta visual/mockups de cada pantalla, sin escribir CSS todavía, a la espera de que el usuario lo inicie).
+
+---
+
+## 2026-07-14 — Sprint UI-03: Design System en código
+
+### Nota de secuencia
+
+`UI-02` (propuesta visual) se trabajó en profundidad para el Dashboard — quedó completamente analizado, discutido y aprobado (auditoría widget por widget, mapeo explícito de qué lógica de cada bloque reutiliza qué reporte, wireframe funcional final con las 4 prioridades: actividad de hoy, alertas críticas, últimos movimientos, accesos rápidos). Las otras 3 decisiones de `UI-02` (Listados modal-vs-página, índice de Reportes grid-vs-lista, layout de Login) siguen **pendientes**, sin resolver. El usuario decidió explícitamente avanzar a `UI-03` (la base de código, que no depende de esas 3 decisiones) antes de cerrarlas, para no bloquear la infraestructura compartida en discusiones que solo afectan a módulos puntuales. `UI-02` se documentará en esta bitácora cuando quede completamente cerrado, siguiendo el mismo criterio ya usado en el resto del proyecto (documentar al finalizar, no a mitad de sprint).
+
+### Alcance aprobado
+
+Reescribir `public/css/style.css` usando los tokens de `docs/design-system.md`: unificar `.card`, sistema de botones, sistema de badges/chips, tablas, alertas, modal y paginación; consolidar `.empty-box`; eliminar duplicados literales. Regla explícita del usuario: **normalización, no rediseño** — ningún módulo cambia de apariencia salvo dos excepciones aprobadas por afectar primitivas globales imposibles de migrar de forma parcial sin duplicar el sistema:
+1. Tipografía → Inter (antes Poppins, que nunca cargaba en vistas autenticadas — el `<link>` solo existía en `welcome.blade.php`).
+2. Botones primarios (`.btn`, `.btn.add`, `.btn.primary`) → turquesa (antes petróleo), dejando el petróleo exclusivo de identidad/marca, según el Design System.
+
+También se autorizó, como ajuste transversal trivial: corregir el `<link>` de Remix Icon duplicado en `app.blade.php`.
+
+Explícitamente fuera de alcance: ningún archivo de vista de módulo, ningún cambio de espaciado/layout/tamaño en CSS específico de Ventas/Compras/Login — eso queda para `UI-05`.
+
+### Implementación
+
+- **`resources/views/app.blade.php`:** se quitó el `<link>` duplicado de Remix Icon y de `style.css` (estaban cargados dos veces: una en `<head>`, otra repetida justo después de `<body>`). Se agregó la carga de Inter (Google Fonts, pesos 400/500/600/700) en `<head>`.
+- **`public/css/style.css`:** reescrito completo (479 → 464 líneas). Se agregó una capa de tokens en `:root` (paleta oficial + tokens semánticos de badge + tipografía + escalas de espaciado/radio/sombra) **sin cambiar el valor de ningún token ya existente** (`--primary`, `--accent`, `--success`, `--ink`, `--muted`, `--bg`, `--card`, `--line` quedan idénticos). Se unificaron `.card` (definido 3 veces), el sistema de botones (`.btn`/`.btn.add`/`.btn.primary`/`.btn.danger`/`.btn-outline`, con conflictos reales de cascada entre dos definiciones de `.btn` que se reconstruyeron propiedad por propiedad), los 3 sistemas de badge/chip (`.chip-*`, `.badge-ok`/`.badge-bad`, `.badge.*` — coexisten, ahora comparten los mismos tokens de color en vez de repetir hex), las tablas (`.table`/`.table thead th` tenían definiciones en conflicto real, no solo duplicadas — se conservó la que efectivamente gana la cascada hoy), el modal, la paginación y `.empty-box`. Se agregaron `.alert-danger` y `.alert-warning` (bug ya documentado en `UI-01`: se usaban en 10 vistas pero nunca estuvieron definidas — dentro del alcance aprobado como "sistema de alertas").
+
+### Verificación
+
+El usuario pidió explícitamente **no** hacer verificación automática en navegador para este sprint; en su lugar, revisión estática línea por línea del CSS viejo contra el nuevo. Se hizo:
+- Reconstrucción manual, selector por selector, del valor **realmente resuelto por la cascada** del archivo original (no el de cada bloque individual) para cada caso con definiciones repetidas o en conflicto, comparado contra el archivo nuevo.
+- Script de diff de selectores (Node) comparando el conjunto completo de selectores de ambos archivos.
+- **Regresión real encontrada y corregida antes de cerrar el sprint:** `.table tr td:first-child`/`:last-child` (esquinas redondeadas + borde lateral en la primera/última celda de fila) y el `border-top` de `.table tbody td` se habían perdido en la primera reescritura — estaban activos hoy en 11 vistas que usan `.table` sin `.table-soft` (Roles, Lotes, Compras, Proveedores, Usuarios, Clientes, formularios de ítems de Ventas/Compras, modal de stock de Productos). Se restauraron con los valores originales exactos antes de dar el sprint por terminado.
+- Dos selectores eliminados sin corregir por ser inofensivos, verificado con grep sobre las vistas reales: `.table-soft tbody tr:hover td` (siempre coexiste con `.table` en las 26 vistas, la regla que sí se conservó ya ganaba la cascada) y `.venta-left .card, .venta-right .card` (producía exactamente los mismos valores que la regla `.card` base conservada).
+- Confirmado explícitamente que `.btn.danger` sigue en coral (no se coló turquesa fuera de los botones primarios).
+
+### Deuda técnica anotada (no corregida, según instrucción explícita)
+
+`.chip-warn`/`.badge.warn` mezclan hue coral (fondo) con texto ámbar (`#b45309`, fuera de la paleta oficial) — ya señalado en `docs/design-system.md` §3. Queda registrado para resolverse en `UI-05`/`UI-06`, no se tocó en este sprint por ser una decisión de color, no de normalización.
+
+### Estado al cierre
+
+`UI-03` completo. Cambios aplicados únicamente en `app.blade.php` (2 líneas) y `public/css/style.css` (reescritura completa). Ninguna otra vista fue tocada. Próximo paso: `UI-04` (componentes Blade reutilizables).
+
+---
+
+## 2026-07-14 (continuación) — Sprint UI-04: componentes Blade reutilizables
+
+### Auditoría previa (sin código)
+
+Se midió con grep, no por estimación, la repetición real de cada patrón candidato a componente en las 26 vistas del proyecto: badges/chips (9 vistas, 16 usos semánticos), botones (24 vistas, 75 usos — incluido un hallazgo relevante: el combo `class="btn btn-outline"`, usado 10 veces, hoy solo se ve como botón outline por el orden de declaración en el CSS, no por diseño explícito), alertas de flash (13+ vistas, con al menos 6 duplicando innecesariamente el flash global que ya muestra `app.blade.php`), estado vacío (7 vistas, 9 usos), cards (12 vistas, 24 usos). Se descartó explícitamente construir `x-modal` (estructuras demasiado distintas entre módulos para diseñar una API sin un caso real concreto delante) y `x-table-filters` (no lo necesita el Dashboard; se construirá al migrar Reportes en `UI-05`, con los 6 casos reales ya disponibles como referencia).
+
+Se acordó con el usuario un alcance de exactamente 5 componentes — ni más, para evitar la sobre-fragmentación en decenas de componentes difíciles de mantener, ni menos: `x-badge`, `x-button`, `x-alert`, `x-empty-state`, `x-card`. Las APIs (props y slots) se definieron y aprobaron explícitamente antes de escribir código, incluyendo un prop `title` en `x-alert` y `x-card`, y una variante `compact` en `x-empty-state` — precisamente para no tener que romper la interfaz de los componentes durante `UI-05`.
+
+### CSS nuevo (agrupado en una sola revisión antes de implementar)
+
+Tres de los cinco componentes requerían una variante que nunca existió en el CSS (no era normalización de `UI-03`, sino una decisión visual nueva). Se agruparon las tres en una sola consulta al usuario en vez de interrumpir varias veces:
+- **`.btn-ghost`** — aprobada sin necesidad de decisión visual: geometría idéntica a `.btn-outline` ya existente, color de texto = token turquesa ya definido. Cero valores inventados.
+- **`.badge.critical`** — sí requería una decisión real (el Design System solo decía "rojo oscuro tenue" sin valor exacto). Aprobado: `rgba(153,27,27,.12)` de fondo, mismo criterio de opacidad `.12` que `--badge-warning-bg`.
+- **`x-empty-state` variante `compact`** — layout de una fila (ícono + texto), sin tarjeta propia, apoyada en el contenedor. Aprobado con la condición explícita de que el comportamiento por defecto (sin `compact`) reproduzca exactamente el `.empty-box` actual.
+
+También se agregó, sin necesitar consulta (tratamiento estándar, sin color nuevo): `opacity:.5; cursor:not-allowed` para el estado `:disabled` de los tres tipos de botón.
+
+### Implementación
+
+- **`public/css/style.css`:** nueva sección "15) Componentes Blade — variantes nuevas (UI-04)", claramente separada de la normalización de `UI-03`. Se agregó también el token `--badge-critical-bg`.
+- **`resources/views/components/`** (carpeta nueva): `badge.blade.php`, `button.blade.php`, `alert.blade.php`, `empty-state.blade.php`, `card.blade.php` — los 5 como componentes Blade anónimos (sin clase PHP), puramente de presentación. `x-button` maneja el caso "deshabilitado con `href`" renderizando siempre `<button disabled>` en vez de un `<a>` (un enlace deshabilitado no es un patrón HTML válido) — pensado explícitamente para el acceso rápido "Registrar devolución" del Dashboard.
+- **Ninguna vista existente fue tocada.** Es exactamente la separación que pidió el usuario: `UI-04` crea, `UI-05` migra.
+
+### Verificación
+
+`tests/Feature/ComponentesBladeTest.php` (nuevo, 19 casos vía `$this->blade()`): cada variante de cada componente genera la clase esperada, `x-button` con `href` renderiza `<a>` y con `disabled` renderiza `<button>` sin importar si se pasó `href`, `x-empty-state` sin `compact` reproduce el `.empty-box` actual byte a byte (salvo espacios en blanco insignificantes, ajustado en el test tras el primer fallo), `x-card` solo renderiza `<h3>` si se pasa `title`. Los 19 pasaron (uno requirió un ajuste menor de aserción, no de componente, por espacios en blanco del `@if` de Blade). Suite completa: 125 passed, 1 fallo preexistente y no relacionado (`ExampleTest`).
+
+### Estado al cierre
+
+`UI-04` completo. Cambios en `public/css/style.css` (una sección nueva, aditiva), `app.blade.php` sin cambios adicionales a los de `UI-03`, y los 5 componentes + su suite de tests como archivos nuevos. Ninguna vista de negocio migrada todavía. Próximo paso: cerrar las 3 decisiones de `UI-02` que siguen pendientes (Listados modal-vs-página, índice de Reportes, layout de Login) antes de `UI-05`.
+
+---
+
+## 2026-07-14 (continuación) — Sprint UI-05 (parte 1): migración del Dashboard
+
+### Decisión de secuencia
+
+El usuario decidió explícitamente **no** cerrar las 3 decisiones de `UI-02` que seguían pendientes (Listados modal-vs-página, índice de Reportes grid-vs-lista, layout de Login) antes de empezar `UI-05` — ninguna de las tres bloquea la migración del Dashboard, cada una se resolverá cuando llegue el turno de migrar su propio módulo.
+
+### Auditoría previa (sin código)
+
+Se auditaron `InicioController::index()` y `resources/views/inicio.blade.php` tal como estaban: 5 tarjetas de conteo, 3 `.info-box` (menos stock, gráfico placeholder nunca implementado, más vendidos) más el widget de vencidos/próximos ya construido en un sprint anterior, y 108 líneas de `<style>` embebido con valores de color ligeramente distintos a los tokens globales (`.badge.danger` en `#ffe2e2`/`#b70000` en vez de los tokens `--badge-danger-*`, `.empty-box` local con padding distinto al global). Se mapeó explícitamente qué lógica de cada bloque nuevo reutiliza qué reporte o scope ya existente, confirmando que ningún bloque requería una consulta nueva.
+
+### Alcance aprobado
+
+1. **`Compra::scopeDelDia()`** — nuevo, calcado exactamente de `Venta::scopeDelDia()` (que existía desde antes sin usarse en ningún lado).
+2. **Reescritura de `InicioController::index()`** en 4 bloques: qué pasó hoy (ventas/compras de hoy — cantidad y monto), alertas críticas (vencidos / próximos a vencer, separados en dos listas top-5 en vez de una mezclada; stock bajo top-5), últimos movimientos (top-10, misma base que el Reporte 6), accesos rápidos.
+3. **Reescritura completa de `inicio.blade.php`** usando `x-card`, `x-badge`, `x-button`, `x-empty-state`; eliminación total del `<style>` embebido.
+4. **Stock bajo:** se mantiene la deuda técnica de duplicar la subquery de `ReporteController::stockBajo()` (documentada en `docs/pendientes.md`, sección `AUS-01`/Reporte 3) — no se extrajo `Producto::scopeConStockBajo()` en este sprint para no ampliar el alcance.
+
+Condición explícita del usuario, igual que en los sprints de Reportes: detenerse y consultar ante cualquier bloqueo real o decisión de diseño no prevista antes de ampliar el alcance.
+
+### Implementación
+
+- **`app/Models/Compra.php`:** agregado `scopeDelDia()`.
+- **`app/Http/Controllers/InicioController.php`:** reescrito completo. `ventasHoy`/`comprasHoy` combinan el scope `delDia()` (cantidad) con una suma vía `DetalleVenta`/`DetalleCompra` (mismo patrón `JOIN` + `SUM(cantidad * precio)` que los reportes de ventas/compras). Vencidos/próximos a vencer reutilizan sin cambios `Producto::scopeConAlertaVencimiento()`, `loteVencidoRelevante()` y `loteProximoRelevante()`, ahora repartidos en `$vencidos`/`$proximosAVencer` en vez de una sola colección `$proximosVencer`. Stock bajo repite la subquery correlacionada ya usada en `ReporteController::stockBajo()`. Últimos movimientos: misma base que el Reporte 6, sin filtros, `limit(10)`.
+- **`resources/views/inicio.blade.php`:** reescrita completa con `x-card`/`x-badge`/`x-button`/`x-empty-state` y clases globales ya existentes (`.info-list`, `.money`, `.two`, `.sb-section`, `.actions`) — sin `<div>` contenedor propio (`.card + .card` en el CSS global ya resuelve el espaciado vertical) y sin ningún CSS nuevo. Las variantes de badge se alinearon con el criterio **ya usado en Reportes**, no inventado: `badge danger` para vencido/sin stock (no `critical`, que el sistema reserva para severidad mayor), `badge warn` para próximo a vencer/stock bajo/salida, `badge ok` para entrada — verificado contra `reportes/vencimientos.blade.php`, `reportes/stock_bajo.blade.php` y `reportes/movimientos.blade.php` antes de fijar cada variante. Los montos (`ventasHoy`/`comprasHoy`) se muestran con `<span class="money">`, no con badge — un badge es un indicador de severidad, no un formato de dato numérico; ningún otro reporte usa badge para montos.
+- El botón "Registrar devolución" del bloque de accesos rápidos se renderiza deshabilitado (`x-button :disabled="true"`), ya que el módulo de devoluciones no existe (`PEND-02`).
+
+### Errores encontrados y corregidos antes de cerrar el sprint
+
+- Primer borrador usaba `<x-badge variant="ok">` para los montos de ventas/compras de hoy — corregido a `<span class="money">` al confirmar contra las vistas de Reportes que los montos nunca se muestran como badge.
+- Primer borrador usaba `variant="critical"` para vencidos y `sin_stock`, inconsistente con `reportes/vencimientos.blade.php` y `reportes/stock_bajo.blade.php`, que usan `danger` para esos mismos estados — corregido a `danger` en ambos casos.
+- `<div class="dashboard-blocks">` (envoltorio inicial de las 4 tarjetas) no tenía ninguna clase CSS definida — eliminado; `<section class="content">` de `app.blade.php` y `.card + .card` del CSS global ya bastan.
+
+### Verificación
+
+- `tests/Feature/DashboardVencimientoTest.php` (preexistente, 5 casos): rompió con `Undefined array key "proximosVencer"` porque el controlador ahora expone `vencidos`/`proximosAVencer` por separado en vez de una sola colección. Actualizado para usar las nuevas claves, preservando exactamente las mismas aserciones de lógica de negocio (deduplicación, lote más próximo, exclusión de lotes vencidos sin stock, reactividad a `dias_alerta_vencimiento`). Los 5 vuelven a pasar.
+- `tests/Feature/DashboardInicioTest.php` (nuevo, 9 casos): ventas/compras de hoy (cantidad y monto correctos, ignorando otros días), stock bajo respeta el umbral configurado y el límite de 5, producto sin lotes se marca `sin_stock`, últimos movimientos ordenados desc. y limitados a 10, estados vacíos del Design System se renderizan, botón de devolución deshabilitado, acceso sin sesión redirige a login.
+- Suite completa: **134 passed**, 1 fallo preexistente y no relacionado (`ExampleTest` — `GET /` devuelve 302 porque `AuthController::welcome()` siempre redirige; hay además una segunda definición muerta de `GET /` en `routes/web.php` por orden de registro. Comportamiento previo a este sprint, no tocado).
+- Verificación contra la base de datos real (MySQL, vía `tinker` con `DB::beginTransaction()`/`rollBack()`): `InicioController::index()` sin excepciones con datos reales, y render completo de la vista (simulando el stack de middleware para compartir `$errors`) sin componentes `<x-...>` sin resolver.
+
+### Documentación actualizada
+
+- `docs/modulos.md`: sección "Módulo: Dashboard" reescrita para reflejar los 4 bloques actuales y la migración a componentes; estado del módulo pasado de "Parcial" a "Completo".
+- `docs/pendientes.md`: `PEND-05` marcado resuelto; nota de deuda técnica junto al Reporte 3 actualizada (el umbral ya está unificado vía `Configuracion`, queda pendiente solo compartir el scope SQL).
+- `docs/design-system.md` §22: `UI-02`, `UI-03`, `UI-04` marcados ✅ Completo (ya lo estaban en la práctica, la tabla no se había actualizado); `UI-05` marcado 🔶 En curso con el Dashboard como primer módulo migrado.
+
+### Estado al cierre
+
+Dashboard migrado y verificado. Próximo paso: continuar `UI-05` con el módulo de Reportes (siguiente en el orden acordado), incluyendo la decisión pendiente de `UI-02` sobre el índice de Reportes (grid vs. lista).
+
+---
+
+## 2026-07-14 (continuación) — Sprint UI-05 (parte 2): decisión grid-vs-lista e índice de Reportes
+
+### Decisión de diseño: índice de Reportes
+
+Antes de escribir código se cerró la decisión de `UI-02` que seguía pendiente para este módulo. Auditoría: `ReporteController::index()` es trivial (`return view('reportes.index')`, sin datos); la vista era una sola `<section class="card">` con un `<h1>`+subtítulo y una columna vertical de 6 `<a class="btn-outline">` con estilos inline, cada uno con icono Remix + título de un reporte, sin ninguna metadata adicional (sin descripción, contador ni estado).
+
+Se presentó una comparación grid vs. lista con ventajas/desventajas concretas para este caso (tabla completa en la conversación con el usuario). Puntos clave: el contenido real de cada ítem es solo icono+título, sin datos que justifiquen el espacio de una tarjeta individual; un grid de tarjetas habría requerido al menos una decisión visual nueva (layout de grid, tratamiento de "tarjeta-enlace") y hubiera chocado con la regla 13 del Design System ("todo debe sentirse ligero" — bloques grandes sin contenido real que los justifique). La lista, en cambio, reutiliza exactamente el patrón ya validado en "Accesos rápidos" del Dashboard (`x-card` + `x-button`), sin CSS nuevo.
+
+**Decisión aprobada:** lista, con `x-button variant="secondary"` (no `ghost`) — conserva la apariencia actual de "botón" (`.btn-outline`), dando jerarquía visual adecuada a una pantalla cuyo propósito es la navegación principal hacia los reportes; `ghost` queda reservado para acciones secundarias dentro de una vista, no para navegación primaria.
+
+### Alcance aprobado
+
+- `ReporteController::index()` sin cambios.
+- Reescribir `resources/views/reportes/index.blade.php` con `x-card` como contenedor y seis `x-button variant="secondary"` (icono + ruta correspondiente).
+- Eliminar los estilos inline de la lista de enlaces.
+- Sin CSS nuevo, sin tocar el Design System.
+
+Condición: sin necesidad de otra aprobación si no aparecía ningún bloqueo imprevisto durante la implementación.
+
+### Implementación
+
+- **`resources/views/reportes/index.blade.php`:** reescrita. El contenedor `<div style="display:flex;flex-direction:column;gap:10px;max-width:420px">` y los 6 `<a class="btn-outline" style="justify-content:flex-start">` se reemplazaron por `<x-card>` envolviendo un `<div class="info-list">` con 6 `<x-button variant="secondary">` (icono + ruta). `.info-list` (ya existente, `display:flex;flex-direction:column;gap:8px`) se reutilizó puramente por su layout vertical — es el mismo mecanismo que ya usa el Dashboard para listar filas, aplicado aquí a botones en vez de filas de datos; no se creó ninguna clase nueva.
+- **Encabezado de página (`<h1 class="page-title" style="margin:0">Reportes</h1>` + subtítulo con `style="color:#64748b;font-weight:600;margin:2px 0 16px"`) se dejó exactamente igual**, dentro del mismo `<x-card>` (no como `x-card :title`, para no degradar visualmente un `<h1>` de página a un `<h3 class="card-title">`). Esos dos inline styles **no** se eliminaron — es el mismo patrón de encabezado usado, sin excepción, en las 6 subvistas de Reportes que todavía no se migran; tocarlo solo aquí habría fragmentado la consistencia del módulo (regla 14/15 del Design System) sin resolver nada, ya que no hay clase `.subtitle`/`.text-muted` definida todavía. Queda para cuando el módulo completo (índice + 6 subvistas) tenga su propio turno de tratamiento de encabezado.
+
+### Verificación
+
+- Los 5 tests `'el indice de reportes lista...'` (uno por cada `Reporte*Test.php`, que hacen `assertSee(route('reportes.X'), false)`) siguen pasando sin cambios — la ruta de cada reporte sigue apareciendo en el HTML.
+- Suite completa: 134 passed, mismo único fallo preexistente no relacionado (`ExampleTest`).
+- Render contra la base de datos real (MySQL, vía `tinker` con `DB::beginTransaction()`/`rollBack()`, simulando el stack de middleware): sin componentes `<x-...>` sin resolver, los 6 `route()` presentes en el HTML generado.
+
+### Documentación actualizada
+
+- `docs/modulos.md`: se corrigió una laguna de documentación no relacionada con este sprint pero descubierta al tocar el módulo — la tabla resumen marcaba "Reportes" y "Movimientos de Stock (vista)" como **Ausente**, desactualizado desde antes de `AUS-01` (2026-07-12). Se agregó la sección "Módulo: Reportes" (rutas, estado de migración de índice vs. subvistas, cross-referencia a `docs/pendientes.md` para el detalle de cada reporte).
+- `docs/design-system.md` §22: `UI-05` actualizado con el índice de Reportes migrado y la decisión grid-vs-lista resuelta.
+
+### Estado al cierre
+
+Índice de Reportes migrado y verificado. Las 6 subvistas de Reportes (vencimientos, stock valorizado, stock bajo, compras, ventas, movimientos) quedan pendientes — se migrarán en un turno posterior dentro del mismo módulo, antes de pasar a Productos según el orden acordado.
+
+---
+
+## 2026-07-14 (continuación) — Sprint UI-05 (parte 3): auditoría y migración de Productos
+
+### Decisión de secuencia
+
+El usuario decidió pasar directamente a Productos y dejar la migración visual de las 6 subvistas de Reportes para después. Motivo explícito: esas subvistas ya usan el Design System de forma indirecta (cards, tablas, badges, botones de `UI-03`/`UI-04`), así que migrarlas ahora es sobre todo limpieza; Productos es un módulo más usado y sirve para validar los componentes en una pantalla con formularios, tablas, filtros, acciones y modales — el patrón que salga de ahí se reutiliza en el resto de módulos.
+
+### Auditoría previa (sin código)
+
+Se auditaron `ProductoController`, `LoteController` y las vistas relacionadas. Hallazgo principal: existen **tres** archivos de vista de "lotes", no uno solo — `productos/lotes/index.blade.php` (alcanzable, pero con un bug visual real: `<h1>`/`<p>` con `style="color:white"`, texto invisible, y una clase `.h-top` que no existe en el CSS), `resources/views/lotes/index.blade.php` (más completa, pero **huérfana**: ninguna ruta la sirve — no existe `Route::get('/lotes', ...)` en `routes/web.php`, y el sidebar la referencia vía `Route::has('lotes.index')`, que siempre es `false`), y el modal "Editar stock" embebido en `productos/index.blade.php` (el que realmente se usa en la práctica, vía `LoteController::bulkUpdate`). De paso se confirmó que una nota de `docs/modulos.md` sobre una ruta `GET /lotes` "con bug" ya estaba desactualizada — esa ruta no existe más en el código actual.
+
+Se identificaron además 5 puntos de fricción entre `productos/index.blade.php` y el catálogo de componentes de `UI-04`, presentados al usuario como decisiones a resolver antes de implementar:
+1. Las acciones de fila (`.action.edit`/`.action.view.stock`/`.action.delete`) son chips de color sólido sin equivalente en `x-button` (que solo tiene `primary`/`secondary`/`danger`/`ghost`).
+2. El chip "Inyectable: No" usa `chip-neutral`, variante que `x-badge` no tiene (`ok|warn|danger|critical` únicamente).
+3. Los campos de formulario de ambos modales no tienen ningún estilo propio — `docs/design-system.md` §10 ("Formularios") está escrito pero nunca se implementó en CSS.
+4. La confirmación de "Eliminar producto" usa `confirm()` nativo, no un modal, aunque `docs/design-system.md` §13 lo exige — pero `UI-04` descartó explícitamente construir `x-modal`.
+5. Qué hacer con las dos vistas de lotes encontradas.
+
+### Decisiones aprobadas para cada punto
+
+1. **Sin cambios.** Anotado como futura evolución del Design System (posible `x-action` o variante nueva), fuera de este sprint.
+2. **Sin cambios.** Se mantiene `<span class="chip chip-neutral">` tal cual — no se amplía la API de `x-badge` recién cerrada por un solo caso de uso.
+3. **Sin cambios.** Los `<input>`/`<select>`/`<textarea>` quedan con su implementación actual; "Formularios" será un sprint independiente que construya la base una sola vez para todo el sistema.
+4. **Sin cambios.** El `confirm()` nativo se queda; el modal de confirmación es infraestructura nueva, no migración de vista, y se reserva para su propio sprint.
+5. **Distinción explícita:** la vista huérfana (`resources/views/lotes/index.blade.php`) **no se elimina todavía** — se documenta, pero primero hay que confirmar que no exista ningún flujo externo que dependa de ella (decisión reversible, evita borrar código por una suposición). `productos/lotes/index.blade.php` tampoco se corrige — no forma parte del flujo principal de Productos y la gestión de lotes como tal no se está migrando en este sprint; el bug de color queda documentado para cuando le toque su turno.
+
+### Alcance final aprobado
+
+Cambio limitado exclusivamente a `resources/views/productos/index.blade.php`. `ProductoController` sin modificaciones. `LoteController` y las vistas de Lotes completamente fuera de alcance. Migración puramente estructural — sin alterar comportamiento: el buscador con autocomplete, la tabla, la paginación y ambos modales debían conservar exactamente su funcionalidad, y todo el JavaScript de la vista debía permanecer intacto.
+
+### Implementación
+
+- `<section class="card">` → `<x-card>`, envolviendo todo el bloque original (encabezado, alertas, buscador, tabla, paginación, estado vacío) — mismo precedente que Dashboard e índice de Reportes. El `<h1 class="page-title">`+subtítulo se dejó exactamente igual dentro del card (mismo criterio ya aprobado para Reportes: es un patrón de encabezado compartido por todo el sistema, se migra cuando le toque su turno conjunto).
+- Botón "Nuevo producto" (`<a href="#" class="btn" id="btn-open-create">`) → `<x-button variant="primary" icon="ri-add-circle-line" href="#" id="btn-open-create">` — conserva `href="#"` y el `id`, por lo que el `e.preventDefault()` + `addEventListener` existente sigue funcionando sin tocar una línea de JS.
+- Botón "Buscar" (`<button class="btn-outline" style="white-space:nowrap">`) → `<x-button type="submit" variant="secondary" icon="ri-filter-2-line">` — se eliminó el `style="white-space:nowrap"` inline (sin reemplazo en CSS, por instrucción de no agregar CSS nuevo); riesgo cosmético menor y aceptado si el texto llegara a partirse en pantallas muy angostas.
+- `@if(session('success'))<div class="alert alert-success">`/`alert-danger` → `<x-alert variant="success">`/`<x-alert variant="danger">`, mismo `@if` guard.
+- `<div class="empty">No hay productos registrados.</div>` (clase `.empty` no definida en el CSS — bug invisible preexistente) → `<x-empty-state message="No hay productos registrados." />`.
+- Los 6 botones de ambos modales (Cancelar/Guardar del modal crear-editar; Añadir lote/Cancelar/Guardar cambios del modal de stock) → `<x-button>` con el variant y `type` correspondientes, conservando todos los `id` (`btn-cancel`, `btn-add-lote`, `btn-cancel-stock`) de los que depende el `@push('scripts')`.
+- **Sin tocar:** `ProductoController`, `LoteController`, el bloque `@push('scripts')` completo, los `<input>`/`<textarea>`/`<label>`/checkbox de ambos formularios, las acciones de fila (`.action.*`), el chip `chip-neutral`, los contenedores `.modal`/`.modal-content` (no son `x-card`), y las dos vistas de lotes.
+
+### Verificación
+
+- `tests/Feature/ProductosIndexTest.php` (nuevo, 10 casos — no existía ningún test de `ProductoController` antes de este sprint): estado vacío con `x-empty-state`, tabla con código/nombre, stock total sumado correctamente vía `withSum`, alertas de éxito/error con las clases `alert alert-success`/`alert alert-danger`, ningún `<x-` sin resolver en el HTML, los 4 ids clave (`btn-open-create`, `btn-cancel`, `btn-add-lote`, `btn-cancel-stock`) presentes para el JS, control de acceso por permiso `productos.ver` (403/200/redirect a login). Alcance deliberadamente acotado a renderizado — no se agregó cobertura de validaciones/CRUD, que sería un esfuerzo aparte no cubierto por este sprint.
+- Suite completa: 144 passed, mismo único fallo preexistente no relacionado (`ExampleTest`).
+- Render contra la base de datos real (MySQL, vía `tinker` con `DB::beginTransaction()`/`rollBack()`, simulando el stack de middleware): sin componentes `<x-...>` sin resolver, los 6 ids/selectores clave presentes en el HTML generado.
+- **Limitación reconocida:** no hay herramienta de navegador/Playwright disponible en este entorno para verificar visualmente el comportamiento real de los modales y el autocompletado en un navegador. Se lo señaló explícitamente al usuario en vez de asumir que la verificación estática (render + ids + tests) equivale a una prueba de UI real.
+
+### Documentación actualizada
+
+- `docs/modulos.md`: sección "Módulo: Productos" ampliada con el detalle de la migración y las 4 decisiones de "sin cambios"; sección "Módulo: Lotes / Stock" corregida (la nota sobre `GET /lotes` "con bug" ya no aplica, esa ruta no existe) y ampliada con los hallazgos sobre las dos vistas de lotes.
+- `docs/pendientes.md`: nuevo `PEND-07` (vistas de lotes duplicadas/rotas) documentando ambos hallazgos y el trabajo pendiente (confirmar huérfana antes de borrar, decidir destino de la vista con bug visual).
+- `docs/design-system.md` §22: `UI-05` actualizado con Productos migrado.
+
+### Estado al cierre
+
+`productos/index.blade.php` migrado y verificado (dentro de las limitaciones de entorno señaladas). Gestión de lotes (`PEND-07`) queda pendiente como su propio tema, no como parte de esta migración. Próximo paso: a decidir con el usuario — continuar `UI-05` con Lotes, o seguir el orden original hacia Compras.
+
+---
+
+## 2026-07-14 (continuación) — Sprint UI-05 (parte 4): Compras (solo índice)
+
+### Decisión de secuencia
+
+El usuario verificó visualmente por su cuenta la migración de Productos (modales, autocomplete, botones, responsive) y no reportó regresiones — cierra ese sprint de forma definitiva. Para el siguiente paso, decide seguir el orden original hacia Compras en vez de abordar `PEND-07` (Lotes) ahora, para no desviarse del plan de migración ya acordado.
+
+### Auditoría previa (sin código)
+
+Se auditaron `CompraController` y las dos vistas del módulo. `compras/index.blade.php` es una vista simple (listado + botón + alerta + tabla), migración directa sin sorpresas. `compras/create.blade.php` resultó ser una vista mucho más compleja: layout de dos columnas (`.venta-wrap`/`.venta-left`/`.venta-right` — nombrado así porque, según el propio comentario del controlador, se copió del formulario de Ventas), 3 cards, 2 modales AJAX (crear producto/proveedor al vuelo), 2 buscadores con autocomplete, y ~450 líneas de JS. Dado el tamaño y la complejidad, se presentó el análisis completo de ambas vistas pero se dejó a criterio del usuario si incluir `create.blade.php` en este sprint.
+
+Se identificaron 3 puntos a confirmar antes de implementar, propios de `create.blade.php`:
+1. `.tabla-box.soft` (wrapper de tabla, distinto de `.table-wrap` usado en Productos/Reportes) — normalizar o dejar como está.
+2. Encabezados de página (`<h2>Compras</h2>`) — mismo criterio ya usado en Dashboard/Reportes/Productos: se preserva.
+3. El card `.venta-left` usa un `<h3 style="margin-bottom:10px">🧾 Registrar compra</h3>` sin `.card-title` ni ícono Remix (usa un emoji, violando la regla "solo Remix Icons" ya escrita en el Design System) — migrarlo a `<x-card title icon>` le agregaría el estilo `.card-title` que hoy no tiene, un cambio visual real aunque corrige una inconsistencia ya documentada.
+
+### Alcance aprobado
+
+El usuario aprobó **únicamente** `compras/index.blade.php` en este sprint — `compras/create.blade.php` queda explícitamente fuera de alcance, para un turno posterior (compartirá patrón con Ventas). Los 3 puntos de fricción de `create.blade.php` quedan sin resolver por ahora, ya que no aplican al índice. Alcance del índice: `<div class="card">` → `<x-card>`, botón "Nueva compra" → `<x-button variant="primary" icon="ri-add-circle-line">`, alerta de sesión → `<x-alert>`, fila `@empty` → `<x-empty-state>` con el `colspan` correspondiente. Tabla, paginación, `CompraController` y el encabezado `<h2>Compras</h2>` sin cambios.
+
+### Implementación
+
+- `resources/views/compras/index.blade.php`: los 4 elementos aprobados migrados exactamente como se planteó. `<x-empty-state message="No hay compras registradas." />` se colocó dentro de un `<td colspan="5">` (el componente renderiza un `<div>`, válido como contenido de una celda).
+- Se descartó el `+ ` literal delante de "Nueva compra" — redundante con el ícono del botón, mismo criterio ya aplicado en Reportes/Productos.
+- Al documentar el cierre se encontró una inexactitud preexistente en `docs/modulos.md`: describía un "total calculado (cantidad × costo_unitario)" y un "panel de detalles expandible por compra" que **no existen** en el código actual — la tabla solo muestra "Total items" (suma de `cantidad`, no un monto) y no tiene ningún panel expandible. Se corrigió la documentación para reflejar el código real, sin tocar el código (fuera de alcance — cambiar qué columnas se muestran no es parte de una migración puramente visual).
+
+### Verificación
+
+- `tests/Feature/ComprasIndexTest.php` (nuevo, 7 casos — no existía ningún test de `CompraController` antes de este sprint): estado vacío con `x-empty-state`, tabla con proveedor y total de ítems, alerta de éxito con `alert alert-success`, ningún `<x-` sin resolver, control de acceso por permiso `compras.ver` (403/200/redirect a login).
+- Suite completa: 151 passed, mismo único fallo preexistente no relacionado (`ExampleTest`).
+- Render contra la base de datos real (MySQL, vía `tinker` con `DB::beginTransaction()`/`rollBack()`, simulando el stack de middleware): sin componentes `<x-...>` sin resolver, la ruta `compras.create` presente en el HTML.
+- Misma limitación de entorno ya señalada en el sprint de Productos: sin herramienta de navegador disponible para clic real; verificación puramente estática (render + tests).
+
+### Documentación actualizada
+
+- `docs/modulos.md`: sección "Módulo: Compras" corregida (inexactitud sobre total/panel expandible) y ampliada con el detalle de la migración del índice y la nota de que `create.blade.php` queda pendiente.
+- `docs/design-system.md` §22: `UI-05` actualizado con Compras (índice) migrado.
+
+### Estado al cierre
+
+`compras/index.blade.php` migrado y verificado. `compras/create.blade.php` queda pendiente, junto con los 3 puntos de fricción identificados en su auditoría, para cuando le toque su turno — probablemente en conjunto con Ventas, dado que comparten el mismo patrón `.venta-wrap`. Próximo paso: a decidir con el usuario.
+
+---
+
+## 2026-07-21 — Sprint UI-04A: estandarización global de errores de validación
+
+### Pedido del usuario
+
+Reemplazar el patrón de Laravel por defecto (lista de errores técnicos en inglés, dentro de un bloque rojo) por un patrón único y consistente en todo el sistema: un banner genérico en español (`x-alert variant="danger"`, sin lista) más el detalle de cada error debajo de su campo vía `@error`. Traducir los mensajes de validación al español. Alcance global — todas las vistas migradas y sin migrar.
+
+### Auditoría previa (sin código)
+
+- **Duplicación del banner de errores:** `app.blade.php` ya renderizaba `$errors->any()` globalmente para toda vista que hiciera `@extends('app')` (casi todas). Tres vistas además tenían su propio bloque local, duplicando el mensaje: `ventas/create.blade.php`, `compras/create.blade.php`, `auth/login.blade.php` (esta última también extiende `app`).
+- **`auth/register.blade.php` rota** (`BUG-10`, no relacionado con el pedido pero descubierto durante la auditoría): `@extends('layouts.app')`, archivo inexistente en el proyecto — `GET /register` fallaba con excepción para cualquier visitante, con el registro público habilitado en `config/fortify.php`.
+- **Cero `@error()` en toda la aplicación** — ningún formulario mostraba errores por campo, todo dependía del banner.
+- **Locale en inglés** (`APP_LOCALE=en`, sin carpeta `lang/`) — de ahí los mensajes tipo "The proveedor id field is required.".
+- **Mapa de los 9 controladores que validan:** 7 formularios "estáticos" (campo fijo con `name` en el Blade: Productos, Proveedores, Clientes, Roles, Usuarios, Configuración, Auth) vs. 3 "dinámicos" (Compras, Ventas, Lotes/stock — filas armadas por JS, sin campo fijo al cual anclar `@error`, y sin repoblar la tabla desde `old()` tras un error).
+
+### Plan aprobado (3 fases)
+
+1. Componente global `x-form-errors` + desduplicación + corrección de `auth/register.blade.php` (bug independiente, se corrige de una vez ya que se está tocando esa zona).
+2. Traducción combinada: `lang/es/validation.php`/`auth.php`/`passwords.php` con la traducción estándar completa (mismas claves que `vendor/laravel/framework/.../en/`) + mensajes `custom` a medida para los campos de mayor uso (`proveedor_id`, `cliente_id`, `items.*.producto_id`, `items.*.cantidad`, `nro_lote`, `fecha_vencimiento`).
+3. `@error` + `.field-error` — solo los 7 formularios estáticos en esta pasada; los 3 dinámicos (Compras/Ventas/Lotes) quedan pendientes de un análisis de diseño aparte (repoblar `old()` en una tabla armada por JS).
+
+### Implementación — Fase 1
+
+- **`resources/views/components/form-errors.blade.php`** (nuevo): `@if ($errors->any())` envolviendo un `<x-alert variant="danger">` con el mensaje fijo en dos líneas ("No se pudo guardar la información." + "Corrige los campos marcados e inténtalo nuevamente."), sin lista.
+- **`app.blade.php`:** el bloque `$errors->any()` inline se reemplazó por `<x-form-errors />` — sigue siendo el único punto de verdad para todas las vistas que extienden `app`.
+- **`ventas/create.blade.php`, `compras/create.blade.php`, `auth/login.blade.php`:** se eliminaron sus bloques locales duplicados (en login, también la clase CSS `.login-alert` que quedó huérfana).
+- **`auth/register.blade.php`:** `@extends('layouts.app')` → `@extends('app')`; se verificó primero que `app.blade.php` no llama `auth()->user()` fuera de un `@auth`/`@endauth` (no iba a cambiar un error por otro al renderizar para un invitado). Se le agregó el mismo mecanismo `body.auth` que ya usa `login.blade.php` para ocultar el sidebar — si no, la vista habría quedado visualmente rota dentro del shell autenticado en vez de fallar.
+- **Hallazgo durante la verificación:** un primer intento de test con `followingRedirects()->post('/register', [...])` sin `->from(...)` daba un falso negativo — sin header `Referer`, el `redirect()->back()` de Laravel/Fortify cae a `/`, que redirige a `/inicio`, que por no haber sesión redirige a `/login`. No es un bug de la app; se corrigió el test agregando `->from('/register')` (y análogo para `/login` y `/rols`) para simular la navegación real de un navegador.
+
+### Implementación — Fase 2
+
+- **`lang/es/validation.php`:** traducción completa de las ~90 claves de Laravel 12 (copiadas de `vendor/laravel/framework/.../en/validation.php` para no omitir ninguna), más `attributes` (nombre en español de cada campo usado en el sistema) y `custom` con las 6 frases naturales pedidas explícitamente (`proveedor_id`, `cliente_id`, `items.*.producto_id`, `items.*.cantidad`, `nro_lote`/`items.*.nro_lote`/`lotes.*.nro_lote`, `fecha_vencimiento`/`items.*.fecha_vencimiento`/`lotes.*.fecha_vencimiento`) — aplicadas también a las variantes con wildcard (`items.*.…`, `lotes.*.…`) para que cubran Compras/Ventas/Lotes, aunque esos formularios no se toquen todavía en la Fase 3.
+- **`lang/es/auth.php`, `lang/es/passwords.php`:** traducción directa de las claves de Fortify (credenciales inválidas, throttle, reseteo de contraseña).
+- **`.env`:** `APP_LOCALE=en` → `es` (se dejó `APP_FALLBACK_LOCALE=en` sin tocar, como red de seguridad ante cualquier clave sin traducir).
+
+### Implementación — Fase 3 (solo formularios estáticos)
+
+- **`public/css/style.css`**, nueva sección §16: `.field-error` (`font-size:12px; color:var(--accent)`, mismo tamaño ya usado para texto secundario en el resto del sistema) — únicamente el texto del mensaje, no el borde/foco de input que describe `docs/design-system.md` §10 completo (eso queda para el futuro sprint de Formularios).
+- `@error('campo')<small class="field-error">{{ $message }}</small>@enderror` agregado debajo de cada input relevante en: `productos/index.blade.php` (codigo, nombre, es_inyectable, description), `proveedors/index.blade.php` (nombre, contacto, telefono), `clientes/index.blade.php` (nombre, documento, telefono), `rols/index.blade.php` (nombre, slug, descripcion), `users/index.blade.php` (username, name, apellido, email, telefono, password, activo, roles), `configuracion/edit.blade.php` (dias_alerta_vencimiento), `auth/login.blade.php` (email, password), `auth/register.blade.php` (name, email, password, password_confirmation).
+- Ningún botón, buscador, tabla ni JS de estas vistas se tocó — solo se agregó la línea `@error` después del campo correspondiente.
+
+### Verificación
+
+- `tests/Feature/FormErrorsTest.php` (nuevo, 4 casos): registro responde 200 (regresión de `BUG-10`), banner aparece **una sola vez** (no duplicado) en registro/login/un formulario autenticado (Roles), con el texto nuevo en español.
+- `tests/Feature/LocalizacionValidacionTest.php` (nuevo, 5 casos): locale de la app es `es`; mensaje genérico traducido para un campo sin `custom` (`nombre` → "El campo nombre es obligatorio."); mensajes personalizados exactos para `proveedor_id`/`items.*.producto_id`/`items.*.nro_lote`; el mensaje `custom` que ya existía directo en `VentaController::store()` (`'items.required' => 'Agrega al menos un renglón de venta.'`) se sigue respetando sin cambios.
+- `tests/Feature/FieldErrorsTest.php` (nuevo, 8 casos): verifica el HTML renderizado (`class="field-error"` presente + mensaje visible) para los 7 formularios estáticos — Productos, Roles, Configuración, Login, Register, Proveedores, Clientes, Usuarios.
+- Suite completa: **168 passed**, mismo único fallo preexistente no relacionado (`ExampleTest`).
+- Verificado contra la base de datos real (MySQL, vía `tinker`): `app()->getLocale()` es `es`, `trans('validation.required', ...)` con el atributo de `proveedor_id` devuelve "El campo proveedor es obligatorio.", render completo de Productos sin excepciones y sin `field-error` presente cuando no hay errores (confirma que el `@error` no se activa falsamente).
+
+### Documentación actualizada
+
+- `docs/design-system.md`: `x-form-errors` agregado al catálogo de componentes (§19, marcado construido); nueva subsección 10.1 documentando qué parte de "Formularios" ya está implementada (`.field-error`) y qué sigue pendiente; §22 con la fila `UI-04A` completa.
+- `docs/pendientes.md`: nuevo `BUG-10` (`auth/register.blade.php` roto, corregido); nuevo `PEND-08` (errores por campo en los 3 formularios dinámicos, con el problema de `old()`/reconstrucción de filas explicado); ambos agregados a la tabla de prioridades.
+
+### Estado al cierre
+
+`UI-04A` completo para los 7 formularios estáticos. Los 3 formularios dinámicos (Compras, Ventas, Lotes/stock) quedan pendientes en `PEND-08`, a la espera de una decisión de diseño sobre cómo repoblar sus tablas desde `old()` antes de agregar `@error` ahí. Próximo paso: a decidir con el usuario — retomar `UI-05` (Ventas/Compras `create`) o abordar `PEND-08` primero, ya que ambos tocan las mismas vistas.
+
+---
+
+## 2026-07-24 — PEND-08: reconstrucción de filas dinámicas y unificación del flujo de validación
+
+### Decisión de secuencia
+
+El usuario eligió abordar `PEND-08` antes de continuar `UI-05` sobre `compras/create`/`ventas/create` — motivo explícito: migrar el aspecto visual sin resolver primero la pérdida de datos ante un error habría sido "mejorar el aspecto y empeorar la experiencia".
+
+### Auditoría — primera pasada (solo reconstrucción visual)
+
+Se auditó cómo llegan los datos al backend en los 3 formularios dinámicos (Compras, Ventas, modal de stock de Productos): las filas se arman 100% por JavaScript y se serializan a `items[i][campo]`/`lotes[i][campo]` recién al enviar — no hay ningún `<input>` fijo en el Blade al cual anclar `@error()`. Durante esta auditoría se encontró que `CompraController::store()` (1 punto) y `VentaController::store()` (2 puntos) usaban `abort(422, "mensaje")` para condiciones de **regla de negocio** (lote vencido, stock insuficiente, e "inconsistencia al descontar por lotes"), no para validación de Laravel — `abort()` no dispara `withInput()`/`withErrors()`, así que esos casos mostraban una página de error genérica y perdían toda la información cargada, un problema más grave que la falta de reconstrucción visual.
+
+### Auditoría — segunda pasada, a pedido del usuario (flujo completo de validación)
+
+Se clasificó cada `abort(422, ...)` uno por uno:
+- Compras (lote vencido, línea 86) y Ventas (stock insuficiente, línea 114): condiciones esperables y corregibles por el usuario → deben tratarse como error de validación.
+- Ventas (línea 154, "problema al descontar stock por lotes"): matemáticamente inalcanzable en operación correcta — los lotes ya están bloqueados (`lockForUpdate()`) desde antes de validar que `$stockTotal >= $cantidadSolicitada`, así que si esto dispara es un bug real de reparto, no una condición del usuario → debe seguir siendo una excepción real, no un error de formulario.
+- `LoteController::bulkUpdate()` (no tenía `abort()`, pero sí `back()->with('error', ...)` sin `withInput()` — mismo problema con otro síntoma) y sin transacción (una fila a mitad de la lista podía quedar guardada si una posterior fallaba).
+
+Se definió la estrategia de unificación: todos los errores corregibles por el usuario pasan a `throw ValidationException::withMessages([...])` con el índice real de la fila (`items.$i.campo`) — el mismo mecanismo que ya usa `$request->validate()` internamente, de forma que `$errors->messages()` queda con la misma forma sin importar el origen del error. Se comparó reconstruir las filas 100% en Blade vs. que JS lea un JSON preparado por Blade — se descartó la primera por duplicar la definición de "cómo se ve una fila" en dos lugares (PHP y JS), el mismo antipatrón que ya causó 3 sistemas de badge distintos en este proyecto; se eligió la segunda, con los nombres (producto/proveedor/cliente) resueltos en PHP vía Eloquent antes de serializar, para que JS nunca dependa de que su array local esté completo/actualizado.
+
+### Ajustes pedidos antes de implementar
+
+1. Errores corregibles → `ValidationException::withMessages(...)`.
+2. La excepción inalcanzable de Ventas → `\RuntimeException`, no error de formulario.
+3. `LoteController::bulkUpdate()` envuelto en `DB::transaction()`.
+4. Una única función JS por vista para construir cada fila.
+5. Preparación del JSON enriquecido movida a una clase dedicada, no al controlador directamente.
+6. JS expone `OLD_ITEMS`/`FIELD_ERRORS`, no `$errors->messages()` directo.
+
+### Implementación
+
+- **`app/Support/FormRecovery.php`** (nuevo): `items($key, $lookups, $labelColumn)` — `old($key, [])` enriquecido con `"<campo>_label"` resuelto vía `whereIn` (una consulta por campo, no una por fila); `label($key, $modelClass)` — resuelve un campo de cabecera simple (`proveedor_id`/`cliente_id`); `fieldErrors()` — misma forma que `$errors->messages()` leyendo `session('errors')`, para no acoplar la vista a `$errors` directamente.
+- **`CompraController`**: `abort(422, "El lote {$nroLote} está vencido...")` → `throw ValidationException::withMessages(["items.$i.fecha_vencimiento" => "..."])` (se agregó el índice `$i` al `foreach`, antes no se usaba). `create()` prepara `oldItems` (enriquecido con `producto_id_label`), `oldProveedorNombre`, `fieldErrors`.
+- **`VentaController`**: `abort(422, "Stock insuficiente...")` → `ValidationException` atada a `items.$i.cantidad`, con el mensaje usando `$producto->nombre` (ya disponible) en vez de "producto ID {$productoId}". El segundo `abort()` → `throw new \RuntimeException(...)`, con un comentario explicando por qué es inalcanzable. `create()` prepara `oldItems`/`oldClienteNombre`/`fieldErrors`.
+- **`LoteController::bulkUpdate()`**: todo el cuerpo envuelto en `DB::transaction()`; los dos `back()->with('error', ...)` → `ValidationException::withMessages(["lotes.$i.nro_lote" => "..."])->redirectTo(route('productos.index', ['stock_error' => $producto->id]))` — se usa `redirectTo()` explícito (no el `back()` implícito) porque el modal de stock es compartido por todos los productos de la tabla y hace falta saber determinísticamente cuál era, sin depender del header `Referer`.
+- **`ProductoController::index()`**: si la query trae `stock_error`, resuelve ese producto (nombre + `old('lotes')` vía `FormRecovery::items('lotes')`) de forma independiente a la paginación/búsqueda actual — así funciona aunque el producto no esté en la página que se esté viendo.
+- **`compras/create.blade.php` / `ventas/create.blade.php`**: se extrajo la construcción del `<tr>` de `agregarFila()` a una función propia (`crearFilaCompra`/`crearFilaVenta`), reutilizada también por un bloque nuevo al final del script que recorre `OLD_ITEMS` y llama a esa misma función con los errores de cada fila (filtrando `FIELD_ERRORS` por el prefijo `items.{i}.`). Campos de cabecera (`proveedor_id`/`cliente_id`/`observacion`) con el patrón estático ya usado en `UI-04A`: `value="{{ old(...) }}"` + `@error()`, y el nombre visible resuelto server-side (`$oldProveedorNombre`/`$oldClienteNombre`) en vez de depender de un cruce en JS.
+- **`productos/index.blade.php`**: mismo refactor en el modal de stock (`crearFilaLote`, reutilizada también por `addEmptyRow`, que antes tenía su propio HTML duplicado) más una función `abrirStockPara(...)` que ahora usan tanto el clic en "Editar stock" como un bloque nuevo que, si `STOCK_ERROR` viene poblado (desde `?stock_error=`), reabre el modal automáticamente con los datos y errores reconstruidos.
+- Los tres `@json(...)` nuevos (`OLD_ITEMS`, `FIELD_ERRORS`, `STOCK_ERROR`) se escribieron con el flag `JSON_UNESCAPED_UNICODE` — sin él, los acentos se serializan como `á` (funciona igual en JS, pero se prefirió el texto plano legible en el HTML fuente; se descubrió al escribir los tests, ver abajo).
+
+### Errores encontrados y corregidos antes de cerrar el sprint
+
+- Primeros tests de `FormRecoveryTest` fallaban al intentar seedear `old()` manualmente vía `session()->flash('_old_input', ...)` sin pasar por un ciclo HTTP real — `Request::old()` depende de `hasSession()` sobre la instancia de `Request` ligada al ciclo actual, no simplemente de escribir en el store de sesión. Se simplificó ese archivo a solo lo verificable de forma aislada (casos vacíos, `fieldErrors()`) y se movió la verificación de `items()`/`label()` a los tests de controlador, que sí ejercitan un `POST`/redirect real.
+- Un test de "no debe quedar rastro de field-error" fallaba porque esa cadena aparece siempre en el **código fuente** de la función JS (`crearFilaCompra` la usa como nombre de clase CSS), independientemente de si hay errores — no es un dato dinámico. Se corrigió el test para verificar `const OLD_ITEMS    = [];` en su lugar.
+- Un test de "el mensaje aparece en la vista" fallaba porque `@json()` escapa acentos a `á` por defecto — el texto buscado no existía tal cual en el HTML. Se corrigió agregando `JSON_UNESCAPED_UNICODE` a los `@json()` nuevos (mejora real, no solo un ajuste de test).
+
+### Verificación
+
+- `tests/Feature/FormRecoveryTest.php` (4 casos), `CompraStockRecoveryTest.php` (3), `VentaStockRecoveryTest.php` (3), `LoteStockRecoveryTest.php` (4) — 14 tests nuevos en total. Cubren: la excepción ya no produce página de error genérica, el mensaje queda atado a la clave de fila correcta (`items.0.fecha_vencimiento`, `items.0.cantidad`, `lotes.0.nro_lote`), la vista reconstruye la fila con el nombre del producto resuelto (no el id crudo) y el error visible, ningún dato persiste cuando falla (incluye una prueba específica de que `bulkUpdate` ya no deja escrituras parciales), y que un envío exitoso no deja rastros de `OLD_ITEMS` en la recarga siguiente.
+- Suite completa: **182 passed**, mismo único fallo preexistente no relacionado (`ExampleTest`).
+- Verificado contra la base de datos real (MySQL, vía `tinker` con `DB::beginTransaction()`/`rollBack()`): las 3 vistas renderizan sin errores previos; el flujo completo de lote vencido lanza `ValidationException` con el mensaje correcto y no persiste ninguna compra.
+
+### Documentación actualizada
+
+- `docs/pendientes.md`: `PEND-08` marcado resuelto, con el detalle completo de la reclasificación de cada `abort()` y la solución implementada.
+- `docs/design-system.md` §10.1: actualizado — `.field-error` ahora cubre también los 3 formularios dinámicos, generado desde JS en vez de `@error()` de Blade, mismo token y aspecto.
+
+### Estado al cierre
+
+`PEND-08` resuelto por completo: los 3 formularios dinámicos preservan la información ingresada y muestran errores por fila ante cualquier fallo (de validación o de regla de negocio), y ya no existe ningún camino en Compras/Ventas/Lotes que termine en una página de error HTTP genérica para una condición de uso normal. Próximo paso: retomar `UI-05` sobre `compras/create.blade.php` y `ventas/create.blade.php`, ahora sí con la base funcional resuelta.
+
+---
+
+## 2026-07-24 (continuación) — Sprint UI-05: migración de `compras/create.blade.php`
+
+### Auditoría
+
+Con `PEND-08` ya resuelto, se retomó la auditoría de esta vista hecha originalmente durante el análisis de `PEND-08`. Estructura: `.venta-left.card` (controles de carga, tabla de ítems, pie con total) con un `<h3 style="margin-bottom:10px">🧾 Registrar compra</h3>` sin `.card-title` ni ícono Remix; `.venta-right` con dos `.card` que ya usan `<h3 class="card-title"><i class="ri-...">` (mapeo directo a `x-card`); 2 modales (Nuevo producto, Nuevo proveedor) sin migrar; botones sueltos "Agregar"/"Cancelar compra"/"Guardar compra" con clases sin componente. Se retomaron las 3 decisiones abiertas del audit original de `PEND-08`:
+- `.tabla-box.soft` vs `.table-wrap`: se mantiene sin cambios, no es parte de esta migración.
+- Encabezados de página: no aplica, esta vista no tiene `<h1>`/`<h2>` de página.
+- El `<h3>` de "Registrar compra": se resolvió migrándolo a `<x-card title="Registrar compra" icon="ri-file-list-3-line">`, reemplazando el emoji y aplicando `.card-title` — mismo tratamiento que ya tienen los otros dos cards de la vista.
+
+### Alcance aprobado
+
+Migrar los 3 `.card` a `<x-card>` y todos los botones (incluidos los de los 2 modales) a `<x-button>`, sin tocar `.tabla-box.soft`, el autocomplete, los cálculos, `OLD_ITEMS`/`FIELD_ERRORS`, el JavaScript, ni `CompraController`. El botón de eliminar fila (generado por `crearFilaCompra()` en JS) explícitamente fuera de alcance.
+
+### Implementación
+
+- `.venta-left.card` → `<x-card class="venta-left" title="Registrar compra" icon="ri-file-list-3-line">` (Blade permite pasar clases extra vía `$attributes`, igual que en Reportes/Productos).
+- Los 2 `.card` de `.venta-right` → `<x-card title="Datos de la compra" icon="ri-truck-line">` / `<x-card title="Confirmar compra" icon="ri-cash-line">` — mapeo 1:1 sin cambios visuales.
+- Botón "Agregar" (`.btn.add`) → `<x-button variant="primary" icon="ri-add-circle-line" id="btnAgregar">`.
+- Botón "Cancelar compra" (`.btn.danger`, `onclick`) → `<x-button variant="danger" icon="ri-close-line" onclick="history.back()">`.
+- Botón "Guardar compra" (`.btn.primary`, `style="width:100%;margin-top:10px"`) → `<x-button type="submit" variant="primary" icon="ri-check-line" style="width:100%;margin-top:10px">` — el estilo inline se conserva vía passthrough de atributos, tal como se acordó explícitamente ("mantener los estilos inline estrictamente necesarios hasta que exista un componente o utilidad compartida").
+- Botones de ambos modales (Cancelar/Guardar) → `<x-button variant="secondary">`/`<x-button variant="primary">`, mismo criterio que Productos.
+- Todos los `id` (`btnAgregar`, `cancelProducto`, `cancelProveedor`, etc.) se conservaron idénticos — el JS de `PEND-08` (reconstrucción desde `OLD_ITEMS`/`FIELD_ERRORS`) sigue funcionando sin cambios.
+
+### Verificación
+
+- Suite completa: 182 passed, mismo único fallo preexistente no relacionado (`ExampleTest`) — incluye los tests de `PEND-08` (`CompraStockRecoveryTest`), que siguen pasando sin cambios sobre la nueva marcación.
+- Render contra la base de datos real (MySQL, vía `tinker` con `DB::beginTransaction()`/`rollBack()`): sin componentes `<x-...>` sin resolver, ids clave e ícono nuevo presentes en el HTML generado.
+
+### Documentación actualizada
+
+- `docs/modulos.md`: sección "Vista de Registro (`compras/create.blade.php`)" actualizada con el detalle de la migración.
+- `docs/design-system.md` §22: Compras marcado completo en `UI-05` (índice + `create`).
+
+### Estado al cierre
+
+`compras/create.blade.php` migrado y verificado. Módulo de Compras completo en `UI-05`. Próximo paso: `ventas/create.blade.php`, que comparte el mismo patrón `.venta-wrap` y ya tiene `PEND-08` resuelto de este lado también.
+
+---
+
+## 2026-07-24 (continuación) — Sprint UI-05: migración de `ventas/create.blade.php`
+
+### Auditoría
+
+Misma estructura que `compras/create.blade.php` (`.venta-wrap`/`.venta-left`/`.venta-right`), con diferencias puntuales: `.venta-left` no tiene ningún encabezado (a diferencia del emoji de Compras); dos botones extra sin equivalente en Compras ("Nuevo cliente", "Público en general"); y el botón "Imprimir recibo" usaba un emoji (🧾) como parte de su texto visible, mismo tipo de inconsistencia que el encabezado ya resuelto en Compras. Se encontraron además: `.badge-ok`/`.badge-bad` en el dropdown de sugerencias de producto (generados por JS, ya definidos en el CSS desde `UI-03` — no requieren corrección) y `.row` (usada dos veces para agrupar botones/controles) **sin ninguna regla en `public/css/style.css`** — clase huérfana, documentada, no corregida por no ser parte del alcance.
+
+### Alcance aprobado
+
+Mismo criterio que Compras: los 3 `.card` → `<x-card>` (con `title`/`icon` solo donde ya existía un encabezado real), todos los botones Blade → `<x-button>`, sin tocar autocomplete, cálculos, FEFO (en `VentaController`, no en la vista), `OLD_ITEMS`/`FIELD_ERRORS`, ni el botón de eliminar fila (generado por JS). Ícono confirmado para "Imprimir recibo": `ri-printer-line`.
+
+### Implementación
+
+- `.venta-left.card` → `<x-card class="venta-left">` (sin `title`, no había encabezado que migrar).
+- Los 2 `.card` de `.venta-right` → `<x-card title="Datos de la venta" icon="ri-file-list-2-line">` / `<x-card title="Realizar venta" icon="ri-cash-line">`.
+- Botones: "Agregar" → `variant="primary"`; "Cancelar venta" → `variant="danger"`; "Nuevo cliente"/"Público en general" → `variant="secondary"`; "Aceptar" (submit) → `variant="primary"`, estilo inline conservado; "Imprimir recibo" → `variant="secondary" icon="ri-printer-line"` (reemplaza el emoji), estilo inline conservado; modal "Nuevo cliente" (Cancelar/Guardar) → `secondary`/`primary`.
+- Todos los `id` conservados (`btnAgregar`, `btnNuevoCliente`, `btnPublico`, `btnTicket`, `cancelCliente`, etc.) — el JS de `PEND-08` y el resto de la lógica siguen funcionando sin cambios.
+
+### Verificación
+
+- Suite completa: 182 passed, mismo único fallo preexistente no relacionado (`ExampleTest`).
+- Render contra la base de datos real (MySQL, vía `tinker` con `DB::beginTransaction()`/`rollBack()`): sin componentes `<x-...>` sin resolver, todos los ids clave y el nuevo ícono presentes en el HTML generado.
+
+### Documentación actualizada
+
+- `docs/modulos.md`: sección "Vista de Registro (`ventas/create.blade.php`)" actualizada con el detalle de la migración y el hallazgo de `.row` huérfana.
+- `docs/design-system.md` §22: Ventas actualizado — `create` migrado, `index` sigue pendiente.
+
+### Estado al cierre
+
+`ventas/create.blade.php` migrado y verificado. Ambos formularios dinámicos (Compras y Ventas `create`) quedan completos en el Design System, con `PEND-08` ya resuelto de base. Pendiente dentro de `UI-05`: `ventas/index.blade.php`, y luego Lotes, Clientes, Proveedores, Usuarios, Roles, Configuración, Login, según el orden acordado.
+
+---
+
+## 2026-07-24 (continuación) — Sprint UI-05: migración de `ventas/index.blade.php` (cierre del módulo Ventas)
+
+### Auditoría
+
+Vista simple, mismo patrón que `compras/index.blade.php`: `<div class="card panel">` con `.toolbar` (`<h1 class="title">Ventas</h1>` + botón "Nueva venta"), tabla paginada, fila `@empty`. Se encontró que la documentación (`docs/modulos.md`) mencionaba un "panel de detalles expandible por venta" que **no existe** en el código actual — misma clase de inexactitud ya corregida antes en la documentación de Compras.
+
+**Hallazgo principal:** el chip de estado (`$map = ['pagada' => 'ok', 'pendiente' => 'warn', 'anulada' => 'bad']`, con `neutral` de fallback) nunca puede mostrar `ok`/`warn`/`bad` con los datos reales, porque `VentaController::store()` siempre guarda `'estado' => 'confirmada'` — un valor ausente del mapa. Documentado como `BUG-11`, sin corregir por ser una decisión de negocio (¿el sistema debería tener estados reales de pago, lo cual requeriría además `PEND-03`? ¿o el mapa de colores debería ajustarse al único valor que existe hoy?), no de presentación.
+
+Se confirmó además que, igual que con el chip "Inyectable" de Productos, `chip-neutral` no tiene variante en `x-badge` — migrar `ok`/`warn`/`bad` a `x-badge` dejando `neutral` como `<span>` crudo habría partido en dos el mismo conjunto de estados.
+
+### Alcance aprobado
+
+`<div class="card panel">` → `<x-card>`, botón "Nueva venta" → `<x-button variant="primary" icon="ri-add-line">`, fila `@empty` → `<x-empty-state>`. Chip de estado **sin migrar** (mismo criterio que Productos). `.toolbar`, encabezado, tabla, paginación y `VentaController::index()` sin cambios. `.ventas-page` (huérfana, sin regla en el CSS) documentada, no corregida.
+
+### Implementación
+
+Exactamente el alcance aprobado, sin desviaciones — mismo patrón mecánico ya aplicado en `compras/index.blade.php`.
+
+### Verificación
+
+- `tests/Feature/VentasIndexTest.php` (nuevo, 5 casos — no existía ningún test de `ventas/index` antes): estado vacío con `x-empty-state`, tabla con total calculado, ningún `<x-` sin resolver, el chip de estado se sigue viendo `neutral` con el estado actual `confirmada` (confirma `BUG-11` en la práctica), acceso sin sesión redirige a login.
+- Suite completa: 187 passed, mismo único fallo preexistente no relacionado (`ExampleTest`).
+- Render contra la base de datos real (MySQL, vía `tinker` con `DB::beginTransaction()`/`rollBack()`): sin componentes `<x-...>` sin resolver.
+
+### Documentación actualizada
+
+- `docs/pendientes.md`: nuevo `BUG-11` (chip de estado nunca refleja pagada/pendiente/anulada), agregado a la tabla de prioridades.
+- `docs/modulos.md`: sección "Vista de Listado (`ventas/index.blade.php`)" corregida (panel expandible inexistente) y ampliada con el detalle de la migración y `BUG-11`.
+- `docs/design-system.md` §22: Ventas marcado completo en `UI-05` (`create` + `index`).
+
+### Estado al cierre
+
+Módulo de Ventas completo en `UI-05` (`create` e `index` migrados). Próximo paso: continuar con Lotes (pendiente desde `PEND-07`), o Clientes/Proveedores/Usuarios/Roles/Configuración/Login según el orden acordado — a decidir con el usuario.
+
+---
+
+## 2026-07-24 (continuación) — Sprint UI-05: migración de `clientes/index.blade.php`
+
+### Decisión de secuencia
+
+El usuario decidió cerrar primero todos los módulos administrativos (Clientes, Proveedores, Roles, Usuarios, Configuración, y luego Login/Register) antes de retomar Lotes — su migración implica revisar arquitectura, vistas huérfanas (`PEND-07`) y decisiones funcionales que exceden una migración al Design System, y el usuario prefiere no interrumpir el ritmo de los listados administrativos por eso.
+
+### Auditoría
+
+Estructura similar a Productos/Proveedores/Roles/Usuarios (index + modal), pero con 3 diferencias reales encontradas:
+1. `<link rel="stylesheet" href="...style.css">` duplicado — el CSS global ya se carga en `app.blade.php`.
+2. `@if(session('success')) ... @elseif(session('error')) ...` local, duplicando el banner que `app.blade.php` ya muestra globalmente — el mismo tipo de problema resuelto en `UI-04A` Fase 1, pero en su momento solo se buscaron duplicados de `$errors->any()`, no de `session('success')`/`session('error')`; esta vista quedó fuera de ese barrido.
+3. `<section class="panel">` en vez de `<div class="card">` — `.panel` solo aplica `padding:18px`, sin el borde/sombra que sí tiene `.card`/`x-card`. Migrar implicaba un cambio visual real, no neutro.
+
+Se verificó que `ClienteController` no necesitaba ningún cambio, y que el modal sigue exactamente el mismo patrón ya migrado en Productos/Proveedores/Roles/Usuarios.
+
+### Decisiones aprobadas
+
+Las 3 confirmadas: eliminar el `<link>` duplicado, eliminar el banner de sesión local (dejando `app.blade.php` como único punto de verdad — mismo criterio a aplicar en Proveedores/Roles/Usuarios/Configuración salvo excepción justificada), y migrar `.panel` → `<x-card>` aceptando el borde/sombra nuevo como parte de la normalización de `UI-05`.
+
+### Implementación
+
+- Eliminado el `<link rel="stylesheet">` duplicado y el bloque `session('success')`/`session('error')` local.
+- `<section class="panel">` → `<x-card>`.
+- Botón "Nuevo cliente" → `<x-button variant="primary" href="#" id="btn-open-create">`.
+- `<div class="empty">` → `<x-empty-state message="No hay clientes registrados." />`.
+- Botones del modal (Cancelar/Guardar) → `<x-button variant="secondary">`/`<x-button variant="primary">`.
+- Sin cambios: modal (JS, prellenado de campos), buscador con sugerencias y filtrado client-side, acciones de fila, `@error()` de `UI-04A`, `ClienteController`.
+- Documentado sin corregir: `<h1 class="h-top">` (clase inexistente) y la tabla sin `.table-wrap`/`.table-soft`.
+
+### Verificación
+
+- `tests/Feature/ClientesIndexTest.php` (nuevo, 8 casos — no existía ningún test de este listado antes): estado vacío, tabla con datos, el mensaje de éxito aparece **una sola vez** (confirma que ya no hay duplicación), ningún `<x-` sin resolver, `style.css` aparece **una sola vez** en el HTML (confirma la eliminación del `<link>` duplicado), ids clave conservados, control de acceso por permiso `clientes.ver`, redirect a login sin sesión.
+- Suite completa: 195 passed, mismo único fallo preexistente no relacionado (`ExampleTest`).
+- Render contra la base de datos real (MySQL, vía `tinker` con `DB::beginTransaction()`/`rollBack()`): sin componentes `<x-...>` sin resolver, `style.css` presente una sola vez.
+
+### Documentación actualizada
+
+- `docs/modulos.md`: sección "Módulo: Clientes" ampliada con el detalle completo de la migración y las 2 duplicaciones eliminadas.
+- `docs/design-system.md` §22: Clientes marcado completo en `UI-05`; se dejó anotado que el chequeo de duplicados de sesión se extiende a los módulos administrativos restantes.
+
+### Estado al cierre
+
+`clientes/index.blade.php` migrado y verificado. Próximo paso, según el orden acordado con el usuario: Proveedores.
+
+---
+
+## 2026-07-24 (continuación) — Sprint UI-05: migración de `proveedors/index.blade.php`
+
+### Auditoría
+
+Mismo patrón que Clientes (index + modal), con las mismas dos duplicaciones (`<link>` de `style.css`, banner de sesión local) más un hallazgo nuevo y más serio: `<h1 class="h-top" style="color:white;">` y `<p style="color:white;">` sobre un fondo claro (`.panel`/`.card` no tienen fondo oscuro) — texto prácticamente invisible, el mismo tipo de bug ya documentado en `PEND-07` para `productos/lotes/index.blade.php`, pero encontrado ahora en un módulo que sí se está migrando activamente. También se encontró: el botón "Buscar" del formulario de búsqueda no tenía ninguna clase CSS (a diferencia de Productos, que usa `.btn-outline`), y el texto del estado vacío tenía un typo ("No hay proveedors registrados.", sin la "e").
+
+Se verificó que `ProveedorController` no necesitaba ningún cambio y que el modal sigue el mismo patrón ya migrado en Productos/Clientes.
+
+### Decisión sobre el texto blanco
+
+Se presentó como hallazgo a confirmar, distinguiéndolo explícitamente del criterio ya establecido de "encabezados se dejan igual, se migran todos juntos en su turno" — ese criterio aplica a diferencias de *estilo* entre encabezados que igual se leen bien; acá el texto directamente no se ve, es un bug de visibilidad. El usuario confirmó corregirlo como parte de este sprint, junto con el typo.
+
+### Alcance aprobado e implementado
+
+- Eliminados el `<link rel="stylesheet">` duplicado y el bloque `session('success')`/`session('error')` local.
+- `<section class="panel">` → `<x-card>` (mismo criterio que Clientes).
+- Quitado `style="color:white"` del `<h1>` y el `<p>` del encabezado.
+- Botón "Nuevo proveedor" → `<x-button variant="primary" href="#">`; botón "Buscar" (antes sin clase) → `<x-button type="submit" variant="secondary">`; botones del modal → `<x-button variant="secondary">`/`<x-button variant="primary">`.
+- `<div class="empty">No hay proveedors registrados.</div>` → `<x-empty-state message="No hay proveedores registrados." />` (typo corregido).
+- Sin cambios: modal (JS, prellenado de campos), acciones de fila, `@error()` de `UI-04A`, `ProveedorController`.
+- Documentado sin corregir: `.search` (clase huérfana, sin regla en el CSS) y la tabla sin `.table-wrap`/`.table-soft`.
+
+### Verificación
+
+- `tests/Feature/ProveedoresIndexTest.php` (nuevo, 9 casos — no existía ningún test de este listado antes): estado vacío con el texto corregido, tabla con datos, ausencia de `color:white` en el HTML, mensaje de éxito una sola vez, ningún `<x-` sin resolver, `style.css` aparece una sola vez, ids clave conservados, control de acceso por permiso `proveedors.ver`, redirect a login sin sesión.
+- Suite completa: 204 passed, mismo único fallo preexistente no relacionado (`ExampleTest`).
+- Render contra la base de datos real (MySQL, vía `tinker` con `DB::beginTransaction()`/`rollBack()`): sin componentes `<x-...>` sin resolver, `style.css` una sola vez, sin `color:white` en el HTML generado.
+
+### Documentación actualizada
+
+- `docs/modulos.md`: sección "Módulo: Proveedores" ampliada con el detalle completo de la migración, las duplicaciones eliminadas y el bug de visibilidad corregido.
+- `docs/design-system.md` §22: Proveedores marcado completo en `UI-05`.
+
+### Estado al cierre
+
+`proveedors/index.blade.php` migrado y verificado. Próximo paso, según el orden acordado: Roles.
+
+---
+
+## 2026-07-24 (continuación) — UI-06: estandarización global de buscadores
+
+### Alcance de este sprint — distinto de `UI-05`
+
+A pedido del usuario, se abrió una tarea nueva (`UI-06`) enfocada exclusivamente en unificar la apariencia y el comportamiento de **todos los buscadores del sistema**, tomando `productos/index.blade.php` como referencia — **no** es la migración completa de Roles/Usuarios a `UI-05` (esos módulos siguen con su `.panel`/`.hero`, alertas y botones sin migrar; solo sus buscadores se tocaron acá). Se corrigió la numeración del roadmap: `UI-06` ya estaba reservado para "Limpieza final" desde `UI-01` — ese sprint se corrió a `UI-07`.
+
+### Auditoría
+
+Se relevaron **10 buscadores en 6 vistas**: 5 de tipo "filtro" (navegan vía GET: Productos —referencia—, Clientes, Proveedores, Usuarios, Roles) y 4 de tipo "selector" (Compras: producto/proveedor; Ventas: producto/cliente — llenan un campo oculto, nunca navegan). Se comparó HTML, CSS y JS de los 10 caso por caso (ver tabla completa en la conversación): quién tiene dropdown, quién usa `.search-wrap.xl`, qué iconografía usa cada uno (Remix vs. emoji), quién ya usa `x-button`, y qué JS se repite literalmente vs. qué es específico de cada contexto.
+
+Se identificaron 3 características que existen en un solo caso y **no** forman parte del patrón común: el filtrado de tabla en vivo de Clientes, la opción "crear nuevo" embebida en el dropdown de Compras (vs. un botón aparte en Ventas), y el badge de disponibilidad de Ventas. Se decidió no generalizarlas ni quitarlas — quedan documentadas como excepciones de sus vistas.
+
+### Decisión de alcance del propio sprint (dos ajustes pedidos por el usuario)
+
+1. **No crear `<x-search-box>` todavía.** Primero normalizar HTML/CSS/JS dentro de cada vista (sin compartir código real), verificar que todo funcione, y recién en un sprint posterior extraer lo reutilizable — para no propagar un eventual error a los 6 módulos a la vez.
+2. **No extraer tampoco a un archivo `public/js/buscador.js` compartido todavía** (se había propuesto como paso intermedio) — mismo motivo: primero validar el patrón repetido, después compartir el código.
+
+### Implementación — patrón unificado aplicado módulo por módulo
+
+- **Proveedores, Usuarios, Roles** (antes: `<form class="search">` + `<button>` sin clase, sin dropdown): se agregó el HTML completo del patrón de Productos (`.search-wrap`, ícono, `<x-button icon="ri-filter-2-line">`, dropdown `#sugg`) y el JS de sugerencias (debounce implícito vía evento `input`, navegación por teclado, cierre al hacer clic afuera), calculando `$suggData` **en la vista** (`@php`) a partir de la colección ya paginada — sin tocar ningún controlador. Iconos por ítem: `ri-truck-line` (Proveedores), `ri-user-3-line` (Usuarios), `ri-lock-2-line` (Roles, mismo ícono que ya usa el sidebar para ese módulo).
+- **Clientes** (ya tenía dropdown): se normalizó el tamaño (`.search-wrap.xl` → `.search-wrap`, igual que Productos), se agregó el botón "Buscar" con `x-button` que no tenía, y se cambió el cierre-al-clic-afuera de depender de un `id` propio (`#search-clients`) a depender de la clase `.search-wrap` (igual que Productos) — el filtrado de tabla en vivo se dejó intacto, como excepción documentada.
+- **Compras y Ventas** (los 4 selectores): único cambio, reemplazar los iconos emoji por Remix (`ri-archive-2-line` para producto, `ri-truck-line` para proveedor, `ri-user-3-line` para cliente, `ri-add-circle-line` para "crear nuevo"). No se tocó la lógica de selección ni nada relacionado con `PEND-08`.
+
+### Incidente técnico durante la implementación (sin impacto en el resultado final)
+
+Al escribir el regex de normalización de acentos (`replace(/[̀-ͯ]/g,'')`) en los archivos nuevos, la secuencia de escape se guardó como caracteres Unicode combinantes literales en vez de la notación `\u...` (aunque funcionalmente equivalente, ya que esos caracteres SON los códigos U+0300/U+036F). Se detectó por inspección y se corrigió con un script PHP puntual que reescribe la expresión regular byte a byte, para que el código fuente quede idéntico al de `productos/index.blade.php` en vez de solo "equivalente". Verificado con `grep` en cada archivo tras la corrección.
+
+### Verificación
+
+- Tests nuevos: `ProveedoresIndexTest.php` (+1 caso sobre el patrón de buscador), `UsuariosBuscadorTest.php` (3 casos, alcance acotado a UI-06), `RolesBuscadorTest.php` (3 casos), `ClientesIndexTest.php` (+2 casos: patrón sin `.xl`/con botón, y filtrado en vivo preservado), `ComprasVentasIconosBuscadorTest.php` (2 casos: ausencia de emoji + presencia de iconos Remix en los 4 selectores).
+- Se re-corrieron explícitamente `CompraStockRecoveryTest.php`/`VentaStockRecoveryTest.php` (`PEND-08`) para confirmar que el cambio de iconos no afectó la reconstrucción de filas — sin cambios, todo sigue pasando.
+- Suite completa: **215 passed**, mismo único fallo preexistente no relacionado (`ExampleTest`).
+- Render contra la base de datos real (MySQL, vía `tinker` con `DB::beginTransaction()`/`rollBack()`): las 4 vistas "filtro" nuevas muestran ícono y dropdown sin componentes sin resolver; Compras/Ventas confirmados sin ningún emoji restante y con los 4 íconos Remix presentes.
+
+### Documentación actualizada
+
+- `docs/design-system.md`: nueva sección 19.1 documentando el patrón unificado (los dos modos, HTML de referencia, excepciones no generalizadas); `x-search-box` agregado al catálogo de componentes previstos (§19); §22 con `UI-06` completo y la renumeración de "Limpieza final" a `UI-07`.
+
+### Estado al cierre
+
+Los 10 buscadores del sistema comparten ahora el mismo HTML/CSS/comportamiento (salvo las 3 excepciones documentadas y deliberadamente no generalizadas). El código sigue sin compartirse entre vistas — eso queda para un sprint posterior, una vez validado en uso real. Próximo paso: retomar el orden de `UI-05` que quedó en pausa — Roles (migración completa a `x-card`/`x-button`/`x-alert`), luego Usuarios, Configuración, y Login/Register.
+
+---
+
+## 2026-07-24 (continuación) — Sprint UI-05: migración de `rols/index.blade.php` (cierre del módulo Roles)
+
+### Auditoría
+
+Se revisó `rols/index.blade.php` y `RolController` completos antes de proponer ningún cambio. Hallazgos:
+
+- Un bloque decorativo `<div class="hero">` con fondo azul (`style="background:#1157c2;color:#fff"`) envolvía todo el contenido, junto con un `<div class="shadow">` y 5 `<span class="bubble b1">`…`<b5>` ("burbujas" decorativas). Se verificó por `grep` en `public/css/style.css` que **ninguna** de las clases `.hero`, `.grid`, `.shadow`, `.bubble`, `.b1`-`.b5` tiene alguna regla definida: el efecto de burbujas nunca llegó a implementarse, y el único efecto visual real venía del `style` inline.
+- La columna de acciones tenía un `<td>` anidado dentro de otro `<td>` (`<td><td class="actions">...</td></td>`) — HTML inválido que los navegadores toleran cerrando implícitamente la etiqueta, pero incorrecto.
+- El `@push('scripts')` cargaba `<script src="{{ asset('js/rols.js') }}">` y exponía `window.routesRolsStore`. Se confirmó por búsqueda en todo el proyecto que **`public/js/rols.js` nunca existió** — ni el archivo ni el directorio `public/js/` existen en el repositorio. Cada carga de `/rols` producía un 404 silencioso (sin romper la página, porque toda la funcionalidad del modal ya estaba implementada en el `<script>` inline de la misma vista).
+- Se confirmó que `RolController` no necesitaba ningún cambio y que el modal sigue el mismo patrón ya migrado en Productos/Clientes/Proveedores.
+- Al leer el controlador se notó que la nota de "Bug Crítico" en `docs/modulos.md` (permisos no sincronizados en `store()`/`update()`) no coincidía con el código actual: ambos métodos sí llaman a `$rol->permisos()->sync(...)`. Se verificó en `docs/pendientes.md` que ese bug (`BUG-01`) ya está marcado **✅ Corregido (2026-07-07)** — la sección de `docs/modulos.md` simplemente nunca se había actualizado tras esa corrección. Se aprovechó esta migración para corregir esa desactualización de la documentación.
+
+### Alcance aprobado e implementado
+
+El usuario aprobó los tres hallazgos con criterios explícitos:
+
+- **A)** Migrar a `<x-card>` y eliminar `.hero`/`.grid`/`.shadow`/`.bubble` y todo su HTML asociado, dado que esas clases no tienen ningún efecto CSS real.
+- **B)** Corregir el `<td>` anidado, como bug de marcado (no como cambio de diseño).
+- **C)** Eliminar el `<script src="js/rols.js">` y `window.routesRolsStore`, como limpieza de código muerto, dejando constancia en este diario de que el archivo nunca existió y nunca fue utilizado.
+
+Implementación:
+- `<div class="hero"><div class="panel" style="background:#1157c2;color:#fff">` → `<x-card>`. Se quitó únicamente `color:#fff` del `<span class="h-top">` del encabezado (habría quedado invisible sobre el nuevo fondo blanco); no se tocó nada más del encabezado, mismo criterio de "los encabezados se normalizan todos juntos en su propio turno" ya aplicado en Clientes/Proveedores.
+- Botón "Nuevo rol" → `<x-button variant="primary" icon="ri-add-line">`; botones del modal (Guardar/Cancelar) → `<x-button variant="primary">`/`<x-button variant="secondary">`.
+- `<div class="empty">No hay roles registrados.</div>` → `<x-empty-state message="No hay roles registrados." />`.
+- `<td><td class="actions">...</td></td>` → un único `<td>` con el mismo contenido interno (Ver/Editar/Eliminar) sin cambios.
+- Eliminado el `@push('scripts')` completo (el script externo y `window.routesRolsStore`); el archivo termina en el `@endpush` del modal.
+- Sin cambios: `RolController`, el modal (JS de crear/editar/ver, autogeneración de slug, cierre al clic afuera), el buscador (ya migrado en `UI-06`), la tabla y `@error()` de `UI-04A`.
+
+### Verificación
+
+- `tests/Feature/RolesIndexTest.php` (nuevo, 8 casos): estado vacío, tabla con datos, ningún `<x-` sin resolver, ausencia de `js/rols.js`/`routesRolsStore`, ausencia de `<td><td>`, patrón de buscador `UI-06`, ids del modal conservados, redirect a login sin sesión.
+- Suite completa: **215 passed**, mismo único fallo preexistente no relacionado (`ExampleTest`).
+- Render contra la base de datos real (MySQL, vía `tinker` con `DB::beginTransaction()`/`rollBack()`, compartiendo manualmente `errors` como `ViewErrorBag` vacío): sin componentes `<x-...>` sin resolver, sin `js/rols.js`, sin `routesRolsStore`, sin `<td><td>`, sin clase `.hero`, sin `bubble`, con `.card` y `.search-wrap` presentes.
+
+### Documentación actualizada
+
+- `docs/modulos.md`: sección "Módulo: Roles" ampliada con el detalle completo de la migración; la nota de "Bug Crítico" se marcó como "a reverificar" en vez de eliminarla, señalando la discrepancia encontrada con el código actual.
+- `docs/design-system.md` §22: Roles marcado completo en `UI-05`.
+
+### Estado al cierre
+
+`rols/index.blade.php` migrado y verificado. Con Clientes, Proveedores y Roles cerrados, el orden acordado por el usuario para los módulos administrativos continúa con: Usuarios (migración completa, no solo su buscador) → Configuración → Login/Register. Después de eso, retomar Lotes (`PEND-07`) y los pendientes funcionales (`BUG-11`, `PEND-09`).
+
+---

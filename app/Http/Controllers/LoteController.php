@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Lote;
 use App\Models\Producto;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class LoteController extends Controller
 {
@@ -101,45 +103,56 @@ class LoteController extends Controller
             'lotes.*.stock'                      => ['required','integer','min:0'],
         ]);
 
-        foreach ($data['lotes'] as $row) {
-            // UPDATE
-            if (!empty($row['id'])) {
-                $lote = \App\Models\Lote::where('id', $row['id'])
-                    ->where('producto_id', $producto->id)
-                    ->firstOrFail();
+        // Envuelto en transacción (PEND-08): antes, si una fila a mitad de la
+        // lista fallaba, las anteriores ya habían quedado guardadas — un
+        // fallo de validación no debe dejar cambios parciales.
+        DB::transaction(function () use ($data, $producto) {
+            foreach ($data['lotes'] as $i => $row) {
+                // UPDATE
+                if (!empty($row['id'])) {
+                    $lote = Lote::where('id', $row['id'])
+                        ->where('producto_id', $producto->id)
+                        ->firstOrFail();
 
-                $lote->update([
-                    'nro_lote'          => $row['nro_lote'] ?? $lote->nro_lote,
-                    'fecha_vencimiento' => $row['fecha_vencimiento'] ?? $lote->fecha_vencimiento,
-                    'costo_unitario'    => $row['costo_unitario'],
-                    'stock'             => $row['stock'],
+                    $lote->update([
+                        'nro_lote'          => $row['nro_lote'] ?? $lote->nro_lote,
+                        'fecha_vencimiento' => $row['fecha_vencimiento'] ?? $lote->fecha_vencimiento,
+                        'costo_unitario'    => $row['costo_unitario'],
+                        'stock'             => $row['stock'],
+                    ]);
+                    continue;
+                }
+
+                // CREATE (cuando id viene vacío). Ambos casos son datos que el
+                // propio usuario tipeó mal (PEND-08): errores de validación
+                // con old()/errors preservados, no un simple flash de sesión.
+                if (empty($row['nro_lote'])) {
+                    throw ValidationException::withMessages([
+                        "lotes.$i.nro_lote" => 'El N° de lote es obligatorio para nuevos lotes.',
+                    ])->redirectTo(route('productos.index', ['stock_error' => $producto->id]));
+                }
+
+                // validar unicidad por producto (nro_lote)
+                $exists = Lote::where('producto_id', $producto->id)
+                    ->where('nro_lote', $row['nro_lote'])
+                    ->whereNull('deleted_at')
+                    ->exists();
+
+                if ($exists) {
+                    throw ValidationException::withMessages([
+                        "lotes.$i.nro_lote" => "El N° de lote {$row['nro_lote']} ya existe para este producto.",
+                    ])->redirectTo(route('productos.index', ['stock_error' => $producto->id]));
+                }
+
+                Lote::create([
+                    'producto_id'        => $producto->id,
+                    'nro_lote'           => $row['nro_lote'],
+                    'fecha_vencimiento'  => $row['fecha_vencimiento'] ?? null,
+                    'costo_unitario'     => $row['costo_unitario'],
+                    'stock'              => $row['stock'],
                 ]);
-                continue;
             }
-
-            // CREATE (cuando id viene vacío)
-            if (empty($row['nro_lote'])) {
-                return back()->with('error', 'El N° de lote es obligatorio para nuevos lotes.');
-            }
-
-            // validar unicidad por producto (nro_lote)
-            $exists = \App\Models\Lote::where('producto_id', $producto->id)
-                ->where('nro_lote', $row['nro_lote'])
-                ->whereNull('deleted_at')
-                ->exists();
-
-            if ($exists) {
-                return back()->with('error', "El N° de lote {$row['nro_lote']} ya existe para este producto.");
-            }
-
-            \App\Models\Lote::create([
-                'producto_id'        => $producto->id,
-                'nro_lote'           => $row['nro_lote'],
-                'fecha_vencimiento'  => $row['fecha_vencimiento'] ?? null,
-                'costo_unitario'     => $row['costo_unitario'],
-                'stock'              => $row['stock'],
-            ]);
-        }
+        });
 
         return back()->with('success', 'Cambios de stock guardados correctamente.');
     }

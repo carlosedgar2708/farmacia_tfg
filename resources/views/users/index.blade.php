@@ -2,6 +2,17 @@
 @section('title','Usuarios')
 
 @section('content')
+@php
+  // Fuente para sugerencias: la página actual (mismo patrón de fallback que productos/index.blade.php)
+  $suggData = $users->map(function($u){
+    return [
+      'id'    => $u->id,
+      'name'  => $u->name,
+      'email' => $u->email,
+    ];
+  })->values();
+@endphp
+
 <section class="hero">
   <div class="panel">
     <h1 class="h-top" style="color:#7dd3fc">Lista de usuarios</h1>
@@ -14,9 +25,13 @@
     @endif
 
     <div class="toolbar">
-      <form class="search" method="GET" action="{{ route('users.index') }}">
-        <input type="text" name="q" value="{{ request('q') }}" placeholder="Buscar usuario...">
-        <button type="submit">Buscar</button>
+      <form id="form-buscar" method="GET" action="{{ route('users.index') }}" style="margin:0">
+        <div class="search-wrap" style="margin-bottom:12px; position:relative">
+          <i class="ri-search-line"></i>
+          <input id="q" type="text" name="q" value="{{ request('q') }}" placeholder="Buscar usuario…">
+          <x-button type="submit" variant="secondary" icon="ri-filter-2-line">Buscar</x-button>
+          <div id="sugg" class="sugg hidden"></div>
+        </div>
       </form>
 
       @if(auth()->user()->tienePermiso('usuarios.crear'))
@@ -113,27 +128,34 @@
         <div class="modal-col">
           <label>Usuario</label>
           <input type="text" name="username" id="f_username" placeholder="(se genera si lo dejas vacío)">
+          @error('username') <small class="field-error">{{ $message }}</small> @enderror
 
           <label>Nombre</label>
           <input type="text" name="name" id="f_name" required>
+          @error('name') <small class="field-error">{{ $message }}</small> @enderror
 
           <label>Apellido</label>
           <input type="text" name="apellido" id="f_apellido">
+          @error('apellido') <small class="field-error">{{ $message }}</small> @enderror
 
           <label>Email</label>
           <input type="email" name="email" id="f_email" required>
+          @error('email') <small class="field-error">{{ $message }}</small> @enderror
 
           <label>Teléfono</label>
           <input type="text" name="telefono" id="f_telefono">
+          @error('telefono') <small class="field-error">{{ $message }}</small> @enderror
 
           <label>Contraseña <small style="color:#64748b">(obligatoria al crear / opcional al editar)</small></label>
           <input type="password" name="password" id="f_password">
+          @error('password') <small class="field-error">{{ $message }}</small> @enderror
 
           <label style="display:flex;align-items:center;gap:8px;margin-top:8px">
             <input type="hidden" name="activo" value="0">
             <input type="checkbox" name="activo" id="f_activo" value="1" checked>
             Activo
           </label>
+          @error('activo') <small class="field-error">{{ $message }}</small> @enderror
         </div>
 
         <div class="modal-col">
@@ -148,6 +170,7 @@
               @endforeach
             </div>
           </div>
+          @error('roles') <small class="field-error">{{ $message }}</small> @enderror
 
           <div class="modal-actions">
             <button class="btn" id="userSubmit" type="submit">Guardar</button>
@@ -290,5 +313,62 @@ function openViewUser(btn){
     console.error('openViewUser error', e);
   }
 }
+
+/* Buscador con sugerencias (mismo patrón que productos/index.blade.php) */
+(function(){
+  const $q    = document.getElementById('q');
+  const $sugg = document.getElementById('sugg');
+  const $form = document.getElementById('form-buscar');
+
+  const SUGG = @json($suggData);
+
+  const norm = s => (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+
+  let items=[], idx=-1;
+
+  function close(){ $sugg.classList.add('hidden'); $sugg.innerHTML=''; items=[]; idx=-1; }
+
+  function render(list){
+    if(!list.length){ close(); return; }
+    items=list;
+    $sugg.innerHTML = list.map((u,i)=>`
+      <div class="sugg-item${i===idx?' active':''}" data-text="${u.name}">
+        <div class="sugg-icon"><i class="ri-user-3-line"></i></div>
+        <div>
+          <div class="sugg-title">${u.name}</div>
+          <div class="sugg-sub">${u.email || '—'}</div>
+        </div>
+      </div>
+    `).join('');
+    $sugg.classList.remove('hidden');
+  }
+
+  const doSearch = ()=>{
+    const q = norm($q.value.trim());
+    if(!q){ close(); return; }
+    const results = SUGG.filter(u=> norm(u.name+' '+u.email).includes(q)).slice(0,12);
+    render(results);
+  };
+
+  $q.addEventListener('input', doSearch);
+
+  $q.addEventListener('keydown', (e)=>{
+    if($sugg.classList.contains('hidden')) return;
+    const max = items.length-1;
+    if(e.key==='ArrowDown'){ e.preventDefault(); idx=Math.min(max,idx+1); render(items); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); idx=Math.max(0,idx-1); render(items); }
+    else if(e.key==='Enter'){
+      if(idx>=0){ e.preventDefault(); $q.value = items[idx].name; }
+      close(); $form.submit();
+    }else if(e.key==='Escape'){ close(); }
+  });
+
+  $sugg.addEventListener('click',(e)=>{
+    const it = e.target.closest('.sugg-item'); if(!it) return;
+    $q.value = it.dataset.text; close(); $form.submit();
+  });
+
+  document.addEventListener('click',(e)=>{ if(!e.target.closest('.search-wrap')) close(); });
+})();
 </script>
 @endpush

@@ -5,6 +5,12 @@
 
   {{-- Iconos Remix --}}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css"/>
+
+  {{-- Tipografía oficial del Design System (docs/design-system.md, sección 4) --}}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="{{ asset('css/style.css') }}?v={{ filemtime(public_path('css/style.css')) }}">
 
   {{-- 👇 Esto permitirá que tus vistas como login usen su propio CSS interno --}}
@@ -12,9 +18,6 @@
 </head>
 
 <body>
-  {{-- Iconos Remix --}}
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css"/>
-<link rel="stylesheet" href="{{ asset('css/style.css') }}?v={{ filemtime(public_path('css/style.css')) }}">
   <div class="layout eres">
     <!-- Sidebar -->
     <aside id="sidebar" class="sidebar">
@@ -193,14 +196,7 @@
         @endonce
 
         @if (session('error'))   <div class="alert alert-danger">{{ session('error') }}</div>   @endif
-        @if ($errors->any())
-          <div class="alert alert-danger">
-            <strong>Revisa los campos:</strong>
-            <ul style="margin:6px 0 0 16px;">
-              @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
-            </ul>
-          </div>
-        @endif
+        <x-form-errors />
       </div>
 
       <section class="content">

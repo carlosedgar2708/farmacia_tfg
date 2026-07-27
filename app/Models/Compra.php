@@ -49,4 +49,12 @@ class Compra extends Model
     {
         return $this->detalles->sum(fn ($d) => $d->cantidad * $d->costo_unitario);
     }
+
+    /* -------------------- SCOPES ÚTILES -------------------- */
+
+    // Compras del día (mismo criterio que Venta::scopeDelDia())
+    public function scopeDelDia($q)
+    {
+        return $q->whereDate('fecha', now()->toDateString());
+    }
 }

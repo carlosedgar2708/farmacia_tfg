@@ -5,7 +5,7 @@
 <div class="page venta-nueva">
   <div class="venta-wrap">
     <!-- IZQUIERDA -->
-    <div class="venta-left card">
+    <x-card class="venta-left">
 
       <!-- Buscador con sugerencias de PRODUCTOS -->
       <div class="search-wrap xl">
@@ -31,7 +31,7 @@
     <input id="ctrl_desc" type="hidden" value="0.00">
     @endif
         <div class="ctrl full">
-          <button id="btnAgregar" class="btn add"><i class="ri-add-circle-line"></i> Agregar</button>
+          <x-button type="button" variant="primary" icon="ri-add-circle-line" id="btnAgregar">Agregar</x-button>
         </div>
       </div>
 
@@ -55,40 +55,33 @@
 
       <!-- Pie -->
       <div class="footer-left">
-        <button type="button" class="btn danger" onclick="history.back()">
-          <i class="ri-close-line"></i> Cancelar venta
-        </button>
+        <x-button type="button" variant="danger" icon="ri-close-line" onclick="history.back()">Cancelar venta</x-button>
         <div class="total-box">
           <span>Total Bs</span>
           <strong id="totalTxt">0.00</strong>
         </div>
       </div>
-    </div>
+    </x-card>
 
     <!-- DERECHA -->
     <div class="venta-right">
       <form id="ventaForm" method="POST" action="{{ route('ventas.store') }}">
         @csrf
 
-        <div class="card">
-          <h3 class="card-title"><i class="ri-file-list-2-line"></i> Datos de la venta</h3>
-
+        <x-card title="Datos de la venta" icon="ri-file-list-2-line">
           {{-- ===== Cliente con buscador ===== --}}
           <label>Cliente</label>
           <div class="search-wrap" id="clientePicker">
             <i class="ri-user-search-line"></i>
-            <input id="clienteSearch" type="text" placeholder="Buscar cliente por nombre… (o dejar vacío para público)">
+            <input id="clienteSearch" type="text" placeholder="Buscar cliente por nombre… (o dejar vacío para público)" value="{{ $oldClienteNombre }}">
             <div id="suggClientes" class="sugg hidden"></div>
           </div>
-          <input type="hidden" name="cliente_id" id="cliente_id" value="">
+          <input type="hidden" name="cliente_id" id="cliente_id" value="{{ old('cliente_id') }}">
+          @error('cliente_id') <small class="field-error">{{ $message }}</small> @enderror
 
           <div class="row" style="margin-top:8px">
-            <button type="button" id="btnNuevoCliente" class="btn btn-outline">
-              <i class="ri-user-add-line"></i> Nuevo cliente
-            </button>
-            <button type="button" id="btnPublico" class="btn btn-outline">
-              <i class="ri-user-3-line"></i> Público en general
-            </button>
+            <x-button type="button" variant="secondary" icon="ri-user-add-line" id="btnNuevoCliente">Nuevo cliente</x-button>
+            <x-button type="button" variant="secondary" icon="ri-user-3-line" id="btnPublico">Público en general</x-button>
           </div>
 
           {{-- ===== ¿Emitir recibo? ===== --}}
@@ -115,15 +108,13 @@
           </div>
 
           <label>Observación</label>
-          <input type="text" name="observacion" placeholder="(opcional)">
+          <input type="text" name="observacion" placeholder="(opcional)" value="{{ old('observacion') }}">
 
           {{-- hidden para mandar 1/0 --}}
           <input type="hidden" name="emitir_recibo" id="emitir_recibo" value="1">
-        </div>
+        </x-card>
 
-        <div class="card">
-          <h3 class="card-title"><i class="ri-cash-line"></i> Realizar venta</h3>
-
+        <x-card title="Realizar venta" icon="ri-cash-line">
           <div class="total-badge" id="totalBadge">0.00</div>
 
           <label>Cantidad recibida</label>
@@ -132,14 +123,9 @@
           <label>Cambio</label>
           <input id="cambio" type="number" step="0.01" value="0.00" readonly>
 
-          <button type="submit" class="btn primary" style="width:100%;margin-top:10px">
-            <i class="ri-check-line"></i> Aceptar
-          </button>
-          <button type="button" id="btnTicket" class="btn btn-outline" style="width:100%;margin-top:8px">
-            🧾 Imprimir recibo
-            </button>
-
-        </div>
+          <x-button type="submit" variant="primary" icon="ri-check-line" style="width:100%;margin-top:10px">Aceptar</x-button>
+          <x-button type="button" variant="secondary" icon="ri-printer-line" id="btnTicket" style="width:100%;margin-top:8px">Imprimir recibo</x-button>
+        </x-card>
 
         <div id="itemsHidden"></div>
       </form>
@@ -158,8 +144,8 @@
       <input type="text" name="documento" placeholder="Documento (opcional)">
       <input type="text" name="telefono" placeholder="Teléfono (opcional)">
       <div class="modal-actions">
-        <button type="button" class="btn btn-outline" id="cancelCliente">Cancelar</button>
-        <button type="submit" class="btn primary">Guardar</button>
+        <x-button type="button" variant="secondary" id="cancelCliente">Cancelar</x-button>
+        <x-button type="submit" variant="primary">Guardar</x-button>
       </div>
     </form>
     <small style="display:block;margin-top:8px;color:#64748b">
@@ -168,15 +154,6 @@
   </div>
 </div>
 
-@if ($errors->any())
-  <div class="alert alert-danger" style="margin-top:12px">
-    <ul style="margin:0;padding-left:16px">
-      @foreach($errors->all() as $e)
-        <li>{{ $e }}</li>
-      @endforeach
-    </ul>
-  </div>
-@endif
 @endsection
 @push('scripts')
 <script>
@@ -185,6 +162,11 @@
    ───────────────────────────────────────────────────────── */
 const PRODUCTOS = @json($productosForJs);
 const CLIENTES  = @json(collect($clientes)->map->only(['id','nombre']));
+const ES_ADMIN  = @json($esAdmin);
+
+/* Reconstrucción tras un error de validación (PEND-08) */
+const OLD_ITEMS    = @json($oldItems, JSON_UNESCAPED_UNICODE);
+const FIELD_ERRORS = @json($fieldErrors, JSON_UNESCAPED_UNICODE);
 
 /* ─────────────────────────────────────────────────────────
    2) Referencias comunes (productos + venta)
@@ -236,7 +218,7 @@ function renderSugerencias(list){
     const stockTot = stockTotalProducto(p);
     const price = precioSugeridoProducto(p);
     return `<div class="sugg-item${i===suggIndex?' active':''}" data-id="${p.id}">
-      <div class="sugg-icon">📦</div>
+      <div class="sugg-icon"><i class="ri-archive-2-line"></i></div>
       <div>
         <div class="sugg-title">${p.nombre}</div>
         <div class="sugg-sub">P. venta Bs ${price.toFixed(2)} · Stock: ${stockTot}</div>
@@ -312,6 +294,50 @@ function resolverProductoDesdeInput(){
   return true;
 }
 
+/* =========================================================
+   CONSTRUCCIÓN DE FILA — única función usada tanto por "Agregar"
+   como por la reconstrucción desde OLD_ITEMS (PEND-08)
+   ========================================================= */
+function crearFilaVenta({productoId, nombre, cantidad, precio, descuento}, erroresFila = {}){
+  const idx = $tbody.children.length+1;
+  const sub = Math.max(0, cantidad*precio - descuento);
+  const err = campo => erroresFila[campo] ? `<small class="field-error">${erroresFila[campo][0]}</small>` : '';
+
+  const tr=document.createElement('tr');
+  tr.dataset.pid   = productoId;
+  tr.dataset.price = precio.toString();
+
+  tr.innerHTML = `
+    <td>${idx}</td>
+    <td>
+      <div style="display:flex;flex-direction:column">
+        <strong>${nombre}</strong>${err('producto_id')}
+      </div>
+    </td>
+
+    <td><input class="in qty" type="number" min="1" step="1" value="${cantidad}">${err('cantidad')}</td>
+
+    <td><input class="in price" type="number" min="0" step="0.01" value="${money(precio)}" readonly></td>
+
+    <td>
+        <input class="in disc" type="number" min="0" step="0.01"
+               value="${money(descuento)}"
+               ${ES_ADMIN ? '' : 'readonly'}
+        >
+    </td>
+
+    <td class="sub">Bs ${money(sub)}</td>
+
+    <td>
+      <button type="button" class="btn btn-outline del">
+        <i class="ri-delete-bin-6-line"></i>
+      </button>
+    </td>
+  `;
+
+  $tbody.appendChild(tr);
+}
+
 function agregarFila(){
   if(!productoSel){
     if(!resolverProductoDesdeInput()){
@@ -334,43 +360,7 @@ function agregarFila(){
     return;
   }
 
-  const tr=document.createElement('tr');
-  tr.dataset.pid   = productoSel.id;
-  tr.dataset.price = precio.toString();
-
-  const idx = $tbody.children.length+1;
-  const sub = Math.max(0,cant*precio - desc);
-  const ES_ADMIN = @json($esAdmin);
-
-tr.innerHTML = `
-  <td>${idx}</td>
-  <td>
-    <div style="display:flex;flex-direction:column">
-      <strong>${productoSel.nombre}</strong>
-    </div>
-  </td>
-
-  <td><input class="in qty" type="number" min="1" step="1" value="${cant}"></td>
-
-  <td><input class="in price" type="number" min="0" step="0.01" value="${money(precio)}" readonly></td>
-
-  <td>
-      <input class="in disc" type="number" min="0" step="0.01"
-             value="${money(desc)}"
-             ${ES_ADMIN ? '' : 'readonly'}
-      >
-  </td>
-
-  <td class="sub">Bs ${money(sub)}</td>
-
-  <td>
-    <button type="button" class="btn btn-outline del">
-      <i class="ri-delete-bin-6-line"></i>
-    </button>
-  </td>
-`;
-
-  $tbody.appendChild(tr);
+  crearFilaVenta({productoId: productoSel.id, nombre: productoSel.nombre, cantidad: cant, precio, descuento: desc});
 
   recalcTotal();
   $qty.value=1;
@@ -439,7 +429,7 @@ function renderSuggClientes(list){
   cItems=list;
   $suggClientes.innerHTML=list.map((c,i)=>`
     <div class="sugg-item${i===cIndex?' active':''}" data-id="${c.id}">
-      <div class="sugg-icon">👤</div>
+      <div class="sugg-icon"><i class="ri-user-3-line"></i></div>
       <div><div class="sugg-title">${c.nombre}</div></div>
       <div></div>
     </div>`).join('');
@@ -577,5 +567,25 @@ function addHidden(name, value){
 const $btnTicket = document.getElementById('btnTicket');
 function hayItems(){ return document.querySelectorAll('#tbl tbody tr').length > 0; }
 // ... resto del ticket igual que ya lo tienes ...
+
+/* =========================================================
+   RECONSTRUCCIÓN TRAS ERROR DE VALIDACIÓN (PEND-08)
+   ========================================================= */
+OLD_ITEMS.forEach((item, i) => {
+  const prefix = `items.${i}.`;
+  const erroresFila = {};
+  Object.keys(FIELD_ERRORS).forEach(key => {
+    if (key.startsWith(prefix)) erroresFila[key.slice(prefix.length)] = FIELD_ERRORS[key];
+  });
+
+  crearFilaVenta({
+    productoId: item.producto_id,
+    nombre: item.producto_id_label || '(producto no encontrado)',
+    cantidad: parseInt(item.cantidad || 0),
+    precio: parseFloat(item.precio || 0),
+    descuento: parseFloat(item.descuento || 0),
+  }, erroresFila);
+});
+if (OLD_ITEMS.length) recalcTotal();
 </script>
 @endpush

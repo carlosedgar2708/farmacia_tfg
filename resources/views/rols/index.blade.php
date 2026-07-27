@@ -3,29 +3,36 @@
 @section('title', 'Lista de Roles')
 
 @section('content')
-<section class="grid" style="grid-template-columns:1fr">
-  <div class="hero">
-    <div class="panel" style="background:#1157c2;color:#fff">
-      <h1><span class="h-top" style="color:#fff;font-size:38px">LISTA DE ROLES</span></h1>
+@php
+  // Fuente para sugerencias: la página actual (mismo patrón de fallback que productos/index.blade.php)
+  $suggData = $rols->map(function($r){
+    return [
+      'id'     => $r->id,
+      'nombre' => $r->nombre,
+      'slug'   => $r->slug,
+    ];
+  })->values();
+@endphp
 
-      {{-- Flash success --}}
-        @if (session('success'))
-        <div class="alert alert-success">{{ session('success') }}
-        </div>
-        @endif
-        <div class="toolbar">
-        {{-- Buscador --}}
-        <form class="search" method="GET" action="{{ route('rols.index') }}">
-            <input type="text" name="q" value="{{ request('q') }}" placeholder="Buscar rol...">
-            <button type="submit">Buscar</button>
-        </form>
+<x-card>
+  <h1><span class="h-top" style="font-size:38px">LISTA DE ROLES</span></h1>
 
-        {{-- Botón de nuevo rol (abre modal) --}}
-        <button type="button" class="btn" onclick="openCreateModal()">+ Nuevo rol</button>
-        </div>
+  <div class="toolbar">
+    {{-- Buscador --}}
+    <form id="form-buscar" method="GET" action="{{ route('rols.index') }}" style="margin:0">
+      <div class="search-wrap" style="margin-bottom:12px; position:relative">
+        <i class="ri-search-line"></i>
+        <input id="q" type="text" name="q" value="{{ request('q') }}" placeholder="Buscar rol…">
+        <x-button type="submit" variant="secondary" icon="ri-filter-2-line">Buscar</x-button>
+        <div id="sugg" class="sugg hidden"></div>
+      </div>
+    </form>
 
+    {{-- Botón de nuevo rol (abre modal) --}}
+    <x-button type="button" variant="primary" icon="ri-add-line" onclick="openCreateModal()">Nuevo rol</x-button>
+  </div>
 
-      {{-- Toolbar --}}
+  {{-- Toolbar --}}
     <script>
     function slugify(str){
     return (str||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
@@ -126,6 +133,63 @@ window.addEventListener('click', e=>{
     }
   });
 })();
+
+/* Buscador con sugerencias (mismo patrón que productos/index.blade.php) */
+(function(){
+  const $q    = document.getElementById('q');
+  const $sugg = document.getElementById('sugg');
+  const $form = document.getElementById('form-buscar');
+
+  const SUGG = @json($suggData);
+
+  const norm = s => (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+
+  let items=[], idx=-1;
+
+  function close(){ $sugg.classList.add('hidden'); $sugg.innerHTML=''; items=[]; idx=-1; }
+
+  function render(list){
+    if(!list.length){ close(); return; }
+    items=list;
+    $sugg.innerHTML = list.map((r,i)=>`
+      <div class="sugg-item${i===idx?' active':''}" data-text="${r.nombre}">
+        <div class="sugg-icon"><i class="ri-lock-2-line"></i></div>
+        <div>
+          <div class="sugg-title">${r.nombre}</div>
+          <div class="sugg-sub">${r.slug || '—'}</div>
+        </div>
+      </div>
+    `).join('');
+    $sugg.classList.remove('hidden');
+  }
+
+  const doSearch = ()=>{
+    const q = norm($q.value.trim());
+    if(!q){ close(); return; }
+    const results = SUGG.filter(r=> norm(r.nombre+' '+r.slug).includes(q)).slice(0,12);
+    render(results);
+  };
+
+  $q.addEventListener('input', doSearch);
+
+  $q.addEventListener('keydown', (e)=>{
+    if($sugg.classList.contains('hidden')) return;
+    const max = items.length-1;
+    if(e.key==='ArrowDown'){ e.preventDefault(); idx=Math.min(max,idx+1); render(items); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); idx=Math.max(0,idx-1); render(items); }
+    else if(e.key==='Enter'){
+      if(idx>=0){ e.preventDefault(); $q.value = items[idx].nombre; }
+      close(); $form.submit();
+    }else if(e.key==='Escape'){ close(); }
+  });
+
+  $sugg.addEventListener('click',(e)=>{
+    const it = e.target.closest('.sugg-item'); if(!it) return;
+    $q.value = it.dataset.text; close(); $form.submit();
+  });
+
+  document.addEventListener('click',(e)=>{ if(!e.target.closest('.search-wrap')) close(); });
+})();
 </script>
 
 
@@ -152,7 +216,6 @@ window.addEventListener('click', e=>{
               <td>{{ $rol->descripcion ?? '-' }}</td>
               <td>{{ optional($rol->created_at)->format('Y-m-d') }}</td>
               <td>
-                <td>
                 <div class="actions">
                     {{-- VER en modal (no navega) --}}
                     <button
@@ -190,8 +253,6 @@ window.addEventListener('click', e=>{
                     <button type="submit" class="action delete" style="border:0;cursor:pointer">Eliminar</button>
                     </form>
                 </div>
-                </td>
-
               </td>
             </tr>
             @endforeach
@@ -204,16 +265,9 @@ window.addEventListener('click', e=>{
       </div>
 
       @else
-        <div class="empty">No hay roles registrados.</div>
+        <x-empty-state message="No hay roles registrados." />
       @endif
-    </div>
-    <div class="shadow"></div>
-
-    {{-- Burbujas deco (opcionales) --}}
-    <span class="bubble b1"></span><span class="bubble b2"></span>
-    <span class="bubble b3"></span><span class="bubble b4"></span><span class="bubble b5"></span>
-  </div>
-</section>
+</x-card>
 @endsection
 
 @push('modals')
@@ -233,12 +287,15 @@ window.addEventListener('click', e=>{
         <div class="modal-col">
           <label for="nombre">Nombre</label>
           <input type="text" name="nombre" id="nombre" required>
+          @error('nombre') <small class="field-error">{{ $message }}</small> @enderror
 
           <label for="slug">Slug</label>
           <input type="text" name="slug" id="slug" required>
+          @error('slug') <small class="field-error">{{ $message }}</small> @enderror
 
           <label for="descripcion">Descripción</label>
           <textarea name="descripcion" id="descripcion" rows="7"></textarea>
+          @error('descripcion') <small class="field-error">{{ $message }}</small> @enderror
         </div>
 
         <!-- Columna derecha: permisos + acciones -->
@@ -258,20 +315,12 @@ window.addEventListener('click', e=>{
           </div>
 
           <div class="modal-actions">
-            <button type="submit" class="btn" id="submitBtn">Guardar</button>
-            <button type="button" class="btn btn-outline" id="cancelBtn" onclick="closeModal()">Cancelar</button>
+            <x-button type="submit" variant="primary" id="submitBtn">Guardar</x-button>
+            <x-button type="button" variant="secondary" id="cancelBtn" onclick="closeModal()">Cancelar</x-button>
           </div>
         </div>
       </div>
     </form>
   </div>
 </div>
-@endpush
-
-@push('scripts')
-  {{-- Exponemos la ruta store para usarla en el JS externo --}}
-  <script>
-    window.routesRolsStore = "{{ route('rols.store') }}";
-  </script>
-  <script src="{{ asset('js/rols.js') }}"></script>
 @endpush

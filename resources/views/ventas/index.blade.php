@@ -4,13 +4,10 @@
 
 @section('content')
 <div class="page ventas-page">
-  <div class="card panel">
+  <x-card>
     <div class="toolbar">
       <h1 class="title">Ventas</h1>
-      <a href="{{ route('ventas.create') }}" class="btn">
-        <i class="ri-add-line"></i>
-        <span>Nueva venta</span>
-      </a>
+      <x-button variant="primary" icon="ri-add-line" href="{{ route('ventas.create') }}">Nueva venta</x-button>
     </div>
 
 
@@ -47,8 +44,8 @@
             </tr>
           @empty
             <tr>
-              <td colspan="6" class="ta-center" style="padding:18px; color:#64748b;">
-                No hay ventas registradas.
+              <td colspan="6">
+                <x-empty-state message="No hay ventas registradas." />
               </td>
             </tr>
           @endforelse
@@ -59,6 +56,6 @@
     <div class="pagination mt-12">
       {{ $ventas->links() }}
     </div>
-  </div>
+  </x-card>
 </div>
 @endsection

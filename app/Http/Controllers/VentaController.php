@@ -8,9 +8,11 @@ use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\Lote;
 use App\Models\MovimientoStock;
+use App\Support\FormRecovery;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
 class VentaController extends Controller
@@ -55,10 +57,18 @@ class VentaController extends Controller
         // no tocar, ni mirar esta bien
             $esAdmin = auth()->user()->esAdmin();
 
+        // Reconstrucción tras un error de validación (PEND-08), mismo criterio que CompraController.
+        $oldItems = FormRecovery::items('items', ['producto_id' => Producto::class]);
+        $oldClienteNombre = FormRecovery::label('cliente_id', Cliente::class);
+        $fieldErrors = FormRecovery::fieldErrors();
+
         return view('ventas.create', [
             'clientes'       => $clientes,
             'productosForJs' => $productosForJs,
             'esAdmin'        => $esAdmin,
+            'oldItems'       => $oldItems,
+            'oldClienteNombre' => $oldClienteNombre,
+            'fieldErrors'    => $fieldErrors,
         ]);
     }
 
@@ -90,7 +100,7 @@ class VentaController extends Controller
             $total = 0;
             $esAdmin = auth()->user()->esAdmin();
 
-            foreach ($data['items'] as $it) {
+            foreach ($data['items'] as $i => $it) {
 
                 $productoId         = (int) $it['producto_id'];
                 $cantidadSolicitada = (int) $it['cantidad'];
@@ -109,9 +119,14 @@ class VentaController extends Controller
                     ->lockForUpdate()
                     ->get();
 
+                // Stock insuficiente es una condición normal (venta concurrente,
+                // o se pidió más de lo disponible) — error corregible por el
+                // usuario (PEND-08), se conserva old()/errors en vez de abort().
                 $stockTotal = $lotes->sum('stock');
                 if ($stockTotal < $cantidadSolicitada) {
-                    abort(422, "Stock insuficiente para el producto ID {$productoId}. Disponible total: {$stockTotal}");
+                    throw ValidationException::withMessages([
+                        "items.$i.cantidad" => "Stock insuficiente para {$producto->nombre}. Disponible: {$stockTotal} unidades.",
+                    ]);
                 }
 
                 // total del item
@@ -151,7 +166,16 @@ class VentaController extends Controller
                 }
 
                 if ($cantidadRestante > 0) {
-                    abort(422, "Ocurrió un problema al descontar stock por lotes. Faltan {$cantidadRestante} unidades.");
+                    // Inalcanzable en operación correcta: los lotes ya están
+                    // bloqueados (lockForUpdate) desde antes de sumar $stockTotal,
+                    // que ya se validó >= $cantidadSolicitada — nadie más pudo
+                    // tocar su stock entre medio. Si esto ocurre es un bug real
+                    // de reparto, no un error de datos del usuario (PEND-08):
+                    // se deja como excepción real (500), no como error de formulario.
+                    throw new \RuntimeException(
+                        "Inconsistencia al descontar stock por lotes del producto ID {$productoId}: ".
+                        "faltan {$cantidadRestante} unidades tras recorrer todos los lotes bloqueados."
+                    );
                 }
             }
 

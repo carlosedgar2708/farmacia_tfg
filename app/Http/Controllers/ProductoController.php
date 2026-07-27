@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Producto;
+use App\Support\FormRecovery;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -28,7 +29,27 @@ class ProductoController extends Controller
             ->orderByDesc('id')
             ->paginate(10)
             ->withQueryString();
-        return view('productos.index', compact('productos', 'q'));
+
+        // Reabrir el modal de stock tras un error de validación en bulkUpdate
+        // (PEND-08). El modal es compartido por todos los productos de la
+        // tabla, así que no basta con old('lotes') — hace falta saber DE QUÉ
+        // producto era, y ese producto puede no estar en la página/búsqueda
+        // actual. Se resuelve aparte, sin depender de la paginación de arriba.
+        $stockError = null;
+        if ($request->filled('stock_error')) {
+            $productoConError = Producto::find((int) $request->input('stock_error'));
+            if ($productoConError) {
+                $stockError = [
+                    'producto_id' => $productoConError->id,
+                    'nombre'      => $productoConError->nombre,
+                    'action'      => route('productos.lotes.bulk', $productoConError),
+                    'lotes'       => FormRecovery::items('lotes'),
+                ];
+            }
+        }
+        $fieldErrors = FormRecovery::fieldErrors();
+
+        return view('productos.index', compact('productos', 'q', 'stockError', 'fieldErrors'));
     }
 
     public function store(Request $request)

@@ -3,26 +3,26 @@
 @section('title','Productos')
 
 @section('content')
-<section class="card">
+<x-card>
   <div class="toolbar" style="margin-bottom:4px">
     <div>
       <h1 class="page-title" style="margin:0">Gestión de Productos</h1>
       <div style="color:#64748b;font-weight:600;margin-top:2px">Administra el catálogo base de productos.</div>
     </div>
     <div>
-      <a href="#" class="btn" id="btn-open-create"><i class="ri-add-circle-line"></i> Nuevo producto</a>
+      <x-button variant="primary" icon="ri-add-circle-line" href="#" id="btn-open-create">Nuevo producto</x-button>
     </div>
   </div>
 
-  @if(session('success')) <div class="alert alert-success">{{ session('success') }}</div> @endif
-  @if(session('error'))   <div class="alert alert-danger">{{ session('error') }}</div> @endif
+  @if(session('success')) <x-alert variant="success">{{ session('success') }}</x-alert> @endif
+  @if(session('error'))   <x-alert variant="danger">{{ session('error') }}</x-alert> @endif
 
   {{-- Buscador con mismo estilo y SUGERENCIAS --}}
   <form id="form-buscar" method="GET" action="{{ route('productos.index') }}" style="margin:0">
     <div class="search-wrap" style="margin-bottom:12px; position:relative">
       <i class="ri-search-line"></i>
       <input id="q" type="text" name="q" placeholder="Buscar por código, nombre o descripción…" value="{{ $q }}">
-      <button type="submit" class="btn-outline" style="white-space:nowrap"><i class="ri-filter-2-line"></i> Buscar</button>
+      <x-button type="submit" variant="secondary" icon="ri-filter-2-line">Buscar</x-button>
       <div id="sugg" class="sugg hidden"></div>
     </div>
   </form>
@@ -111,9 +111,9 @@
       {{ $productos->onEachSide(1)->links() }}
     </div>
   @else
-    <div class="empty">No hay productos registrados.</div>
+    <x-empty-state message="No hay productos registrados." />
   @endif
-</section>
+</x-card>
 
 {{-- ================== Modal Crear/Editar producto ================== --}}
 <div id="modal" class="modal">
@@ -127,20 +127,24 @@
 
       <label>Código *</label>
       <input type="text" name="codigo" id="f-codigo" required maxlength="50">
+      @error('codigo') <small class="field-error">{{ $message }}</small> @enderror
 
       <label>Nombre *</label>
       <input type="text" name="nombre" id="f-nombre" required maxlength="255">
+      @error('nombre') <small class="field-error">{{ $message }}</small> @enderror
 
       <label style="display:flex;align-items:center;gap:8px;margin-top:8px">
         <input type="checkbox" name="es_inyectable" id="f-iny"> Es inyectable
       </label>
+      @error('es_inyectable') <small class="field-error">{{ $message }}</small> @enderror
 
       <label>Descripción</label>
       <textarea name="description" id="f-description" rows="3"></textarea>
+      @error('description') <small class="field-error">{{ $message }}</small> @enderror
 
       <div class="modal-actions">
-        <button type="button" class="btn-outline" id="btn-cancel">Cancelar</button>
-        <button type="submit" class="btn">Guardar</button>
+        <x-button type="button" variant="secondary" id="btn-cancel">Cancelar</x-button>
+        <x-button type="submit" variant="primary">Guardar</x-button>
       </div>
     </form>
   </div>
@@ -155,7 +159,7 @@
     <form id="stock-form" method="POST" action="#">
       @csrf
       <div style="display:flex;justify-content:flex-end;margin:8px 0">
-        <button type="button" id="btn-add-lote" class="btn-outline"><i class="ri-add-line"></i> Añadir lote</button>
+        <x-button type="button" variant="secondary" icon="ri-add-line" id="btn-add-lote">Añadir lote</x-button>
       </div>
 
       <div class="table-wrap">
@@ -174,8 +178,8 @@
       </div>
 
       <div class="modal-actions">
-        <button type="button" class="btn-outline" id="btn-cancel-stock">Cancelar</button>
-        <button type="submit" class="btn">Guardar cambios</button>
+        <x-button type="button" variant="secondary" id="btn-cancel-stock">Cancelar</x-button>
+        <x-button type="submit" variant="primary">Guardar cambios</x-button>
       </div>
     </form>
   </div>
@@ -321,16 +325,36 @@
   function openStock(){ stockModal.style.display='block'; }
   function closeStock(){ stockModal.style.display='none'; stockRows.innerHTML=''; stockForm.reset(); }
 
-  function addEmptyRow(idx){
+  /* =========================================================
+     CONSTRUCCIÓN DE FILA — única función usada para filas nuevas
+     vacías, filas existentes del producto, y la reconstrucción
+     desde OLD_ITEMS tras un error de validación (PEND-08)
+     ========================================================= */
+  function crearFilaLote(l, idx, erroresFila = {}){
+    const err = campo => erroresFila[campo] ? `<small class="field-error">${erroresFila[campo][0]}</small>` : '';
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>nuevo<input type="hidden" name="lotes[${idx}][id]" value=""></td>
-      <td><input type="text" name="lotes[${idx}][nro_lote]" required maxlength="100"></td>
-      <td><input type="date" name="lotes[${idx}][fecha_vencimiento]"></td>
-      <td><input type="number" step="0.01" min="0" name="lotes[${idx}][costo_unitario]" required></td>
-      <td><input type="number" min="0" name="lotes[${idx}][stock]" required></td>
+      <td>${l.id ?? 'nuevo'}<input type="hidden" name="lotes[${idx}][id]" value="${l.id ?? ''}">${err('id')}</td>
+      <td><input type="text" name="lotes[${idx}][nro_lote]" value="${l.nro_lote ?? ''}" maxlength="100">${err('nro_lote')}</td>
+      <td><input type="date" name="lotes[${idx}][fecha_vencimiento]" value="${l.fecha_vencimiento ?? ''}">${err('fecha_vencimiento')}</td>
+      <td><input type="number" step="0.01" min="0" name="lotes[${idx}][costo_unitario]" value="${l.costo_unitario ?? 0}">${err('costo_unitario')}</td>
+      <td><input type="number" min="0" name="lotes[${idx}][stock]" value="${l.stock ?? 0}">${err('stock')}</td>
     `;
-    stockRows.appendChild(tr);
+    return tr;
+  }
+
+  function abrirStockPara(nombre, action, lotes, erroresPorFila = {}){
+    stockTitle.textContent = 'Stock de ' + nombre;
+    stockForm.action = action;
+    stockRows.innerHTML = '';
+
+    if (!lotes.length) {
+      stockRows.innerHTML = `<tr><td colspan="5" style="text-align:center">No hay lotes.</td></tr>`;
+    } else {
+      lotes.forEach((l, idx)=> stockRows.appendChild(crearFilaLote(l, idx, erroresPorFila[idx] || {})));
+    }
+
+    openStock();
   }
 
   btnAddLote?.addEventListener('click', (e)=>{
@@ -339,7 +363,7 @@
     if (stockRows.children.length === 1 && stockRows.children[0].querySelector('td[colspan]')) {
       stockRows.innerHTML = '';
     }
-    addEmptyRow(idx);
+    stockRows.appendChild(crearFilaLote({}, idx));
   });
 
   document.querySelectorAll('.action.stock').forEach(btn=>{
@@ -348,34 +372,34 @@
       const nombre = btn.dataset.nombre || 'Producto';
       const action = btn.dataset.action;
       const lotes  = JSON.parse(btn.dataset.lotes || '[]');
-
-      stockTitle.textContent = 'Stock de ' + nombre;
-      stockForm.action = action;
-      stockRows.innerHTML = '';
-
-      if (!lotes.length) {
-        stockRows.innerHTML = `<tr><td colspan="5" style="text-align:center">No hay lotes.</td></tr>`;
-      } else {
-        lotes.forEach((l, idx)=>{
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${l.id}<input type="hidden" name="lotes[${idx}][id]" value="${l.id}"></td>
-            <td>${l.nro_lote ?? ''}</td>
-            <td><input type="date" name="lotes[${idx}][fecha_vencimiento]" value="${l.fecha_vencimiento ?? ''}"></td>
-            <td><input type="number" step="0.01" min="0" name="lotes[${idx}][costo_unitario]" value="${l.costo_unitario ?? 0}"></td>
-            <td><input type="number" min="0" name="lotes[${idx}][stock]" value="${l.stock ?? 0}"></td>
-          `;
-          stockRows.appendChild(tr);
-        });
-      }
-
-      openStock();
+      abrirStockPara(nombre, action, lotes);
     });
   });
 
   btnCloseStock?.addEventListener('click', closeStock);
   btnCancelStock?.addEventListener('click', closeStock);
   window.addEventListener('click', (e)=>{ if(e.target===stockModal) closeStock(); });
+
+  /* =========================================================
+     REABRIR TRAS ERROR DE VALIDACIÓN (PEND-08) — el modal es
+     compartido por todos los productos, así que hace falta saber
+     de cuál era antes de poder reconstruirlo.
+     ========================================================= */
+  const STOCK_ERROR   = @json($stockError, JSON_UNESCAPED_UNICODE);
+  const FIELD_ERRORS  = @json($fieldErrors, JSON_UNESCAPED_UNICODE);
+
+  if (STOCK_ERROR) {
+    const erroresPorFila = {};
+    Object.keys(FIELD_ERRORS).forEach(key => {
+      const m = key.match(/^lotes\.(\d+)\.(.+)$/);
+      if (m) {
+        const idx = m[1];
+        erroresPorFila[idx] = erroresPorFila[idx] || {};
+        erroresPorFila[idx][m[2]] = FIELD_ERRORS[key];
+      }
+    });
+    abrirStockPara(STOCK_ERROR.nombre, STOCK_ERROR.action, STOCK_ERROR.lotes, erroresPorFila);
+  }
 })();
 </script>
 @endpush

@@ -1,22 +1,88 @@
 /* =========================================================
-   0) Variables & Base
+   Farmacia Katy — Design System (UI-03)
+   Ver especificación completa en docs/design-system.md
+
+   Este archivo normaliza y tokeniza el CSS existente. Regla de este
+   sprint: cero rediseño de módulos — cada selector conserva su
+   apariencia actual, salvo dos cambios globales ya aprobados:
+     1) Tipografía del sistema pasa a Inter (antes Poppins, que nunca
+        cargaba en vistas autenticadas).
+     2) Los botones de acción principal pasan de petróleo a turquesa
+        (color de "acciones principales" del Design System).
+
+   Índice:
+     0) Tokens y base
+     1) Layout principal (sidebar + main)
+     2) Botones
+     3) Cards
+     4) Tablas
+     5) Badges / chips (estado)
+     6) Alertas
+     7) Paginación
+     8) Estado vacío
+     9) Modales
+     10) Permisos (UI)
+     11) Auth (login/register) — base compartida
+     12) Venta/Compra — layout transaccional (Ventas, Compras)
+     13) Acciones de fila (Productos y similares)
+     14) Dashboard — listas de alerta
+   ========================================================= */
+
+/* =========================================================
+   0) Tokens y base
    ========================================================= */
 :root{
-  --primary:#357c90;   /* azul petróleo */
-  --accent:#f27d72;    /* coral */
-  --success:#c4e6b0;   /* verde claro */
+  /* Paleta oficial (docs/design-system.md §3) — valores sin cambios
+     respecto al CSS anterior, salvo --action (nuevo). */
+  --primary:#357c90;     /* azul petróleo — identidad/marca */
+  --action:#12a594;      /* turquesa — acciones principales */
+  --action-hover:#0e8c7f;
+  --action-tint:#e3f6f3;
+  --accent:#f27d72;      /* coral — error/acciones destructivas */
+  --danger-dark:#991b1b; /* rojo oscuro — uso muy limitado/crítico */
+  --success:#c4e6b0;     /* verde semántico — éxito (excepción justificada, ver §3) */
+
   --ink:#1f2937;
   --muted:#64748b;
   --bg:#f6f8fb;
   --card:#ffffff;
   --line:#e5e7eb;
+
+  /* Tokens de color para badges/chips (§15) — antes repetidos como
+     hex sueltos en 3 sistemas de clases distintos; ahora un solo
+     origen por significado semántico. */
+  --badge-success-bg: rgba(196,230,176,.35);
+  --badge-success-text: #166534;
+  --badge-warning-bg: rgba(242,125,114,.12);
+  --badge-warning-text: #b45309;
+  --badge-danger-bg: #fee2e2;
+  --badge-danger-text: #991b1b;
+  --badge-neutral-bg: #eef2ff;
+  --badge-neutral-text: #3730a3;
+  --badge-critical-bg: rgba(153,27,27,.12); /* UI-04: mismo criterio de opacidad .12 que --badge-warning-bg */
+
+  /* Tipografía (§4) */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+
+  /* Espaciado — escala de 4px (§5). Disponible para código nuevo;
+     el CSS existente conserva sus valores puntuales tal cual. */
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
+  --space-5:24px; --space-6:32px; --space-8:48px;
+
+  /* Radios (§6) */
+  --radius-sm:8px; --radius-md:12px; --radius-lg:16px; --radius-full:999px;
+
+  /* Sombras (§7) */
+  --shadow-sm:0 1px 2px rgba(15,23,42,.06);
+  --shadow-md:0 4px 12px rgba(15,23,42,.08);
+  --shadow-lg:0 12px 32px rgba(15,23,42,.12);
 }
 
 *{ box-sizing:border-box }
 html,body{ height:100% }
 body{
   margin:0;
-  font-family:Poppins,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  font-family:var(--font-sans);
   color:var(--ink);
   background:var(--bg);
 }
@@ -117,29 +183,28 @@ a{ color:inherit }
 .sidebar.collapsed .brand span{ display:none }
 
 /* =========================================================
-   2) Tarjetas / Paneles / Botones
+   2) Botones
    ========================================================= */
-.card{
-  background:var(--card);
-  border:1px solid var(--line);
-  border-radius:16px;
-  padding:16px;
-  box-shadow:0 6px 18px rgba(0,0,0,.04);
-}
-.panel{ padding:18px } /* alias */
-
-.toolbar{
-  display:flex; flex-wrap:wrap; gap:12px;
-  align-items:center; justify-content:space-between; margin:6px 0 14px;
-}
-.title{ font-size:22px }
-
+/* Base: hoy conviven varias convenciones de nombre (.btn suelto,
+   .btn.add, .btn.primary, .btn-outline) — se conservan todas para no
+   romper vistas existentes; todas comparten un único origen visual. */
 .btn{
   display:inline-flex; align-items:center; gap:8px;
-  padding:12px 18px; border-radius:999px; font-weight:700;
-  background:var(--primary); color:#fff; text-decoration:none; border:0; cursor:pointer;
+  padding:10px 14px; border-radius:var(--radius-md); font-weight:800;
+  background:var(--action); color:#fff; text-decoration:none; border:0; cursor:pointer;
 }
 .btn:hover{ filter:brightness(.96) }
+.btn i{font-size:18px}
+
+.btn.add{ background:var(--action); color:#fff }
+.btn.add:hover{ filter:brightness(.95) }
+
+.btn.primary{ background:var(--action); color:#fff }
+.btn.primary:hover{ filter:brightness(.95) }
+
+.btn.danger{ background:var(--accent); color:#fff }
+.btn.danger:hover{ filter:brightness(.95) }
+
 .btn-outline{
   display:inline-flex; align-items:center; gap:8px;
   padding:10px 14px; border-radius:10px; font-weight:700;
@@ -148,20 +213,45 @@ a{ color:inherit }
 .btn-outline:hover{ background:#f8fafc }
 
 /* =========================================================
-   3) Tabla (Ventas y similares)
+   3) Cards
    ========================================================= */
+.card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius-lg);
+  padding:var(--space-4);
+  box-shadow:0 6px 16px rgba(0,0,0,.05);
+}
+.card + .card{ margin-top:14px }
+.card-title{ font-weight:800; margin-bottom:10px; color:var(--primary); display:flex; gap:8px; align-items:center }
+.panel{ padding:18px } /* alias */
+
+.toolbar{
+  display:flex; flex-wrap:wrap; gap:12px;
+  align-items:center; justify-content:space-between; margin:6px 0 14px;
+}
+.title{ font-size:22px }
+
+/* =========================================================
+   4) Tablas
+   ========================================================= */
+/* Nota de normalización: el CSS anterior tenía dos definiciones de
+   .table en conflicto (una con filas "flotantes" que nunca llegó a
+   verse por el orden de cascada, y la que realmente se renderiza).
+   Se conserva la que ya está activa hoy — cero cambio visual. */
 .table-wrap{ overflow:auto }
 .table{
   width:100%;
   border-collapse:separate;
-  border-spacing:0 8px; /* filas “flotadas” */
+  border-spacing:0;
 }
 .table thead th{
-  font-weight:800; text-align:left; color:#334155; padding:10px 12px; font-size:13px;
+  background:#eaf2f5; color:#0f172a; border-bottom:1px solid var(--line);
+  font-weight:800; text-align:left; padding:12px 10px; font-size:13px;
 }
 .table tbody td{
-  background:#fff; color:#0f172a; padding:14px 12px; vertical-align:middle;
-  border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+  background:#fff; color:#0f172a; padding:12px 10px; vertical-align:middle;
+  border-top:1px solid var(--line); border-bottom:1px solid #eef2f7;
 }
 .table tr td:first-child{
   border-left:1px solid var(--line); border-top-left-radius:12px; border-bottom-left-radius:12px;
@@ -169,67 +259,97 @@ a{ color:inherit }
 .table tr td:last-child{
   border-right:1px solid var(--line); border-top-right-radius:12px; border-bottom-right-radius:12px;
 }
-.table-soft tbody tr:hover td{ background:#f8fafc }
+.table tbody tr:hover td{ background:#f9fbfc }
+.table.compact td input.in{ width:100%; text-align:right; border:1px solid var(--line); border-radius:8px; padding:7px }
 .money{ font-weight:800 }
 
-/* =========================================================
-   4) Chips / Badges (estados)
-   ========================================================= */
-.chip{
-  display:inline-block; padding:6px 10px; border-radius:999px;
-  font-weight:700; font-size:12px; line-height:1;
-  border:1px solid transparent;
-}
-.chip-ok{    background:rgba(196,230,176,.35); color:#166534; border-color:#c4e6b0 } /* pagada */
-.chip-warn{  background:rgba(242,125,114,.12); color:#b45309; border-color:#f27d72 } /* pendiente */
-.chip-bad{   background:#fee2e2; color:#991b1b; border-color:#fecaca }               /* anulada */
-.chip-neutral{ background:#eef2ff; color:#3730a3; border-color:#e0e7ff }
+.tabla-box.soft{ padding:0; border:1px solid var(--line); border-radius:14px; overflow:hidden }
 
 /* =========================================================
-   5) Alerts & Pagination
+   5) Badges / chips (estado)
+   ========================================================= */
+/* Antes: 3 sistemas de nombre distintos (.chip-*, .badge-ok/.badge-bad
+   sueltos, .badge.*) con los mismos colores repetidos como hex crudo
+   en cada uno. Se mantienen los 3 nombres (las vistas actuales los
+   usan tal cual) pero todos leen del mismo token por significado —
+   cero vistas tocadas, cero color distinto al de hoy. */
+.chip{
+  display:inline-block; padding:6px 10px; border-radius:var(--radius-full);
+  font-weight:700; font-size:12px; line-height:1; border:1px solid transparent;
+}
+.badge{
+  font-weight:800; font-size:12px; padding:4px 8px; border-radius:var(--radius-full);
+  background:var(--badge-neutral-bg); color:var(--badge-neutral-text); white-space:nowrap;
+}
+
+.chip-ok, .badge-ok, .badge.ok{ background:var(--badge-success-bg); color:var(--badge-success-text) }
+.chip-ok{ border-color:#c4e6b0 }
+
+.chip-warn, .badge.warn{ background:var(--badge-warning-bg); color:var(--badge-warning-text) }
+.chip-warn{ border-color:var(--accent) }
+
+.chip-bad, .badge-bad, .badge.danger{ background:var(--badge-danger-bg); color:var(--badge-danger-text) }
+.chip-bad{ border-color:#fecaca }
+
+.chip-neutral{ background:var(--badge-neutral-bg); color:var(--badge-neutral-text); border-color:#e0e7ff }
+
+/* =========================================================
+   6) Alertas
    ========================================================= */
 .alert{
   padding:12px 14px; border-radius:10px; margin:10px 0;
-  background:#ecfeff; border:1px solid #a5f3fc; color:#155e75; font-weight:600
+  background:#ecfeff; border:1px solid #a5f3fc; color:#155e75; font-weight:600;
 }
 .alert-success{ background:#d1fae5; border-color:#10b981; color:#065f46 }
 
+/* Antes ausentes: se usan en 10 vistas (incluido app.blade.php para
+   errores de validación) pero nunca estuvieron definidas — hasta
+   ahora caían en el estilo .alert genérico (info/celeste). */
+.alert-danger{ background:var(--badge-danger-bg); border-color:#fca5a5; color:var(--badge-danger-text) }
+.alert-warning{ background:var(--badge-warning-bg); border-color:var(--accent); color:var(--badge-warning-text) }
+
+/* =========================================================
+   7) Paginación
+   ========================================================= */
 .pagination{ display:flex; gap:8px; flex-wrap:wrap; align-items:center }
 .pagination a,.pagination span{
   padding:8px 12px; border:1px solid var(--line); border-radius:10px;
-  text-decoration:none; color:#0f172a; background:#fff
+  text-decoration:none; color:#0f172a; background:#fff;
 }
 .pagination .active span{ background:var(--primary); border-color:var(--primary); color:#fff }
 
+/* =========================================================
+   8) Estado vacío
+   ========================================================= */
 .empty-box{
   background:#f4f6f8;
   padding:20px;
-  border-radius:8px;
+  border-radius:var(--radius-sm);
   text-align:center;
   color:#999;
 }
 
 /* =========================================================
-   6) Modales (opcional)
+   9) Modales
    ========================================================= */
 .modal{
   display:none; position:fixed; inset:0; width:100%; height:100%;
   overflow:auto; background:rgba(0,0,0,.5); backdrop-filter:blur(3px);
-  z-index:9999
+  z-index:9999;
 }
 .modal-content{
   background:#fff; color:#1e293b; margin:6% auto; padding:20px 30px;
-  border-radius:16px; max-width:520px; box-shadow:0 20px 50px rgba(0,0,0,.2)
+  border-radius:var(--radius-lg); max-width:520px; box-shadow:0 20px 50px rgba(0,0,0,.2);
 }
 .modal-content.modal-wide{ max-width:980px; border-radius:14px }
 .modal-title{ margin:0 0 10px 0 }
 .modal-content input,.modal-content textarea{
   width:100%; padding:10px; margin-bottom:12px; font:inherit;
-  border:1px solid #d1d5db; border-radius:10px
+  border:1px solid #d1d5db; border-radius:10px;
 }
 .close{
   float:right; font-size:26px; font-weight:700; cursor:pointer;
-  background:transparent; border:0; line-height:1
+  background:transparent; border:0; line-height:1;
 }
 .close:hover{ color:#ef4444 }
 .modal-grid{ display:grid; grid-template-columns:1.1fr 1fr; gap:18px }
@@ -240,11 +360,11 @@ a{ color:inherit }
 }
 
 /* =========================================================
-   7) Permissions UI (opcional)
+   10) Permisos (UI) — sin cambios de comportamiento
    ========================================================= */
 .perm-box{
   background:#f8fafc; border:1px solid var(--line); border-radius:10px;
-  padding:10px; max-height:360px; overflow:auto
+  padding:10px; max-height:360px; overflow:auto;
 }
 .perm-box::-webkit-scrollbar{ width:6px }
 .perm-box::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:4px }
@@ -260,7 +380,7 @@ a{ color:inherit }
 .perm-item span{ margin:0 !important; line-height:1.4; letter-spacing:.2px }
 
 /* =========================================================
-   8) Auth (login/register) - simple
+   11) Auth (login/register) — base compartida, sin cambios
    ========================================================= */
 .auth-form{ max-width:480px }
 .auth-form .field{ margin-bottom:14px }
@@ -270,210 +390,125 @@ a{ color:inherit }
 }
 .auth-actions{ display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:flex-start }
 
+/* =========================================================
+   12) Venta / Compra — layout transaccional
+   (Ventas, Compras — sin cambios de comportamiento; se deduplicaron
+   los bloques que estaban repetidos dos veces en el archivo anterior)
+   ========================================================= */
+.venta-wrap{ display:grid; grid-template-columns:1.6fr 1fr; gap:20px; align-items:start }
+@media(max-width:1024px){ .venta-wrap{ grid-template-columns:1fr } }
 
-/* ======== VENTA NUEVA – LAYOUT ======== */
-.venta-wrap{display:grid;grid-template-columns:1.6fr 1fr;gap:20px;align-items:start}
-@media(max-width:1024px){.venta-wrap{grid-template-columns:1fr}}
-
-.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 6px 16px rgba(0,0,0,.05)}
-.card + .card{margin-top:14px}
-.card-title{font-weight:800;margin-bottom:10px;color:var(--primary);display:flex;gap:8px;align-items:center}
-
-/* ======== CONTROLES ======== */
-.top-controls{margin-top:10px}
-.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}
-.grid4 .full{grid-column:1/-1}
-.ctrl{display:flex;flex-direction:column;gap:6px}
+.top-controls{ margin-top:10px }
+.grid4{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; align-items:end }
+.grid4 .full{ grid-column:1/-1 }
+.ctrl{ display:flex; flex-direction:column; gap:6px }
 .ctrl input, .venta-right input, .venta-right select{
-  width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:inherit;background:#fff;color:var(--ink)
+  width:100%; border:1px solid var(--line); border-radius:12px; padding:10px 12px; font:inherit; background:#fff; color:var(--ink);
 }
-.ctrl input[readonly]{background:#f1f5f9;color:#475569}
-input:focus,select:focus{outline:2px solid var(--success)}
+.ctrl input[readonly]{ background:#f1f5f9; color:#475569 }
+input:focus, select:focus{ outline:2px solid var(--success) }
 
-/* ======== BUSCADOR + SUGERENCIAS ======== */
-.search-wrap{position:relative;display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 12px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
-.search-wrap i{color:#94a3b8;font-size:18px}
-.search-wrap input{flex:1;border:0;outline:0;font-size:15px}
-.search-wrap.xl{padding:12px 16px;border-radius:999px;border-color:rgba(53,124,144,.35)}
-.search-wrap.xl:focus-within{box-shadow:0 0 0 3px rgba(53,124,144,.18)}
+.search-wrap{ position:relative; display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px 12px; box-shadow:0 2px 10px rgba(0,0,0,.06) }
+.search-wrap i{ color:#94a3b8; font-size:18px }
+.search-wrap input{ flex:1; border:0; outline:0; font-size:15px }
+.search-wrap.xl{ padding:12px 16px; border-radius:999px; border-color:rgba(53,124,144,.35) }
+.search-wrap.xl:focus-within{ box-shadow:0 0 0 3px rgba(53,124,144,.18) }
 
-.sugg{position:absolute;top:100%;left:0;right:0;margin-top:8px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.14);max-height:320px;overflow:auto;z-index:50}
-.sugg.hidden{display:none}
-.sugg-item{display:grid;grid-template-columns:48px 1fr auto;gap:12px;align-items:center;padding:12px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9}
-.sugg-item:last-child{border-bottom:0}
-.sugg-item:hover,.sugg-item.active{background:rgba(53,124,144,.10)}
-.sugg-icon{width:48px;height:48px;border-radius:12px;background:#eef2ff;display:grid;place-items:center;color:#64748b;font-size:20px}
-.sugg-title{font-weight:800;color:#0f172a}
-.sugg-sub{font-size:12px;color:#64748b}
-.badge-ok{background:rgba(196,230,176,.35);color:#166534;padding:4px 8px;border-radius:999px;font-weight:800;font-size:12px}
-.badge-bad{background:#fee2e2;color:#991b1b;padding:4px 8px;border-radius:999px;font-weight:800;font-size:12px}
+.sugg{ position:absolute; top:100%; left:0; right:0; margin-top:8px; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 18px 40px rgba(0,0,0,.14); max-height:320px; overflow:auto; z-index:999 }
+.sugg.hidden{ display:none }
+.sugg-item{ display:grid; grid-template-columns:48px 1fr auto; gap:12px; align-items:center; padding:12px 14px; cursor:pointer; border-bottom:1px solid #f1f5f9 }
+.sugg-item:last-child{ border-bottom:0 }
+.sugg-item:hover,.sugg-item.active{ background:rgba(53,124,144,.10) }
+.sugg-icon{ width:48px; height:48px; border-radius:12px; background:#eef2ff; display:grid; place-items:center; color:#64748b; font-size:20px }
+.sugg-title{ font-weight:800; color:#0f172a }
+.sugg-sub{ font-size:12px; color:#64748b }
 
-/* ======== TABLA ======== */
-.tabla-box.soft{padding:0;border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.table{width:100%;border-collapse:separate;border-spacing:0}
-.table thead th{
-  background:#eaf2f5;color:#0f172a;border-bottom:1px solid var(--line);
-  font-weight:800;text-align:left;padding:12px 10px;font-size:13px
-}
-.table tbody td{padding:12px 10px;border-bottom:1px solid #eef2f7}
-.table tbody tr:hover td{background:#f9fbfc}
-.table.compact td input.in{width:100%;text-align:right;border:1px solid var(--line);border-radius:8px;padding:7px}
-
-/* ======== PIE / TOTALES ======== */
-.footer-left{display:flex;align-items:center;justify-content:space-between;padding:10px 12px}
-.total-box{display:flex;align-items:center;gap:8px;font-size:20px;font-weight:800;color:var(--primary)}
-
-/* ======== BOTONES ======== */
-.btn{display:inline-flex;gap:8px;align-items:center;border:0;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;text-decoration:none}
-.btn.add{background:var(--primary);color:#fff}
-.btn.add:hover{filter:brightness(.95)}
-.btn.danger{background:var(--accent);color:#fff}
-.btn.danger:hover{filter:brightness(.95)}
-.btn i{font-size:18px}
-
-/* ======== PANEL DERECHA ======== */
-.venta-right .card label{font-weight:700;margin:8px 0 6px;display:block}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-@media(max-width:520px){.two{grid-template-columns:1fr}}
+.footer-left{ display:flex; align-items:center; justify-content:space-between; padding:10px 12px }
+.total-box{ display:flex; align-items:center; gap:8px; font-size:20px; font-weight:800; color:var(--primary) }
 .total-badge{
-  font-size:34px;font-weight:900;text-align:center;
-  background:var(--success);color:#1f2937;border-radius:12px;padding:12px;margin:10px 0
+  font-size:34px; font-weight:900; text-align:center;
+  background:var(--success); color:#1f2937; border-radius:12px; padding:12px; margin:10px 0;
 }
-.btn.primary{background:var(--primary);color:#fff}
-.btn.primary:hover{filter:brightness(.95)}
 
-/* ======== VENTA NUEVA ======== */
-.venta-wrap{display:grid;grid-template-columns:1.6fr 1fr;gap:20px;align-items:start}
-@media(max-width:1024px){.venta-wrap{grid-template-columns:1fr}}
+.venta-right .card label{ font-weight:700; margin:8px 0 6px; display:block }
+.two{ display:grid; grid-template-columns:1fr 1fr; gap:10px }
+@media(max-width:520px){ .two{ grid-template-columns:1fr } }
 
-.venta-left .card, .venta-right .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 6px 16px rgba(0,0,0,.05)}
-.card + .card{margin-top:14px}
-.card-title{font-weight:800;margin-bottom:10px;color:var(--primary);display:flex;gap:8px;align-items:center}
-
-/* controles */
-.top-controls{margin-top:10px}
-.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}
-.grid4 .full{grid-column:1/-1}
-.ctrl{display:flex;flex-direction:column;gap:6px}
-.ctrl input, .venta-right input, .venta-right select{
-  width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:inherit;background:#fff;color:var(--ink)
-}
-.ctrl input[readonly]{background:#f1f5f9;color:#475569}
-input:focus,select:focus{outline:2px solid var(--success)}
-
-/* buscador + sugerencias */
-.search-wrap{position:relative;display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 12px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
-.search-wrap i{color:#94a3b8;font-size:18px}
-.search-wrap input{flex:1;border:0;outline:0;font-size:15px}
-.search-wrap.xl{padding:12px 16px;border-radius:999px;border-color:rgba(53,124,144,.35)}
-.search-wrap.xl:focus-within{box-shadow:0 0 0 3px rgba(53,124,144,.18)}
-
-.sugg{position:absolute;top:100%;left:0;right:0;margin-top:8px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.14);max-height:320px;overflow:auto;z-index:999}
-.sugg.hidden{display:none}
-.sugg-item{display:grid;grid-template-columns:48px 1fr auto;gap:12px;align-items:center;padding:12px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9}
-.sugg-item:last-child{border-bottom:0}
-.sugg-item:hover,.sugg-item.active{background:rgba(53,124,144,.10)}
-.sugg-icon{width:48px;height:48px;border-radius:12px;background:#eef2ff;display:grid;place-items:center;color:#64748b;font-size:20px}
-.sugg-title{font-weight:800;color:#0f172a}
-.sugg-sub{font-size:12px;color:#64748b}
-.badge-ok{background:rgba(196,230,176,.35);color:#166534;padding:4px 8px;border-radius:999px;font-weight:800;font-size:12px}
-.badge-bad{background:#fee2e2;color:#991b1b;padding:4px 8px;border-radius:999px;font-weight:800;font-size:12px}
-
-/* tabla */
-.tabla-box.soft{padding:0;border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.table{width:100%;border-collapse:separate;border-spacing:0}
-.table thead th{
-  background:#eaf2f5;color:#0f172a;border-bottom:1px solid var(--line);
-  font-weight:800;text-align:left;padding:12px 10px;font-size:13px
-}
-.table tbody td{padding:12px 10px;border-bottom:1px solid #eef2f7}
-.table tbody tr:hover td{background:#f9fbfc}
-.table.compact td input.in{width:100%;text-align:right;border:1px solid var(--line);border-radius:8px;padding:7px}
-
-/* pie / totales */
-.footer-left{display:flex;align-items:center;justify-content:space-between;padding:10px 12px}
-.total-box{display:flex;align-items:center;gap:8px;font-size:20px;font-weight:800;color:var(--primary)}
-.total-badge{font-size:34px;font-weight:900;text-align:center;background:var(--success);color:#1f2937;border-radius:12px;padding:12px;margin:10px 0}
-
-/* botones */
-.btn.add{background:var(--primary);color:#fff}
-.btn.add:hover{filter:brightness(.95)}
-.btn.danger{background:var(--accent);color:#fff}
-.btn.danger:hover{filter:brightness(.95)}
-
-/* ===== Productos: botones de acciones ===== */
-.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.actions form{display:inline}                    /* para que el form de eliminar no rompa el flujo */
-.actions form .action{display:inline-flex}
+/* =========================================================
+   13) Acciones de fila (Productos y similares)
+   ========================================================= */
+.actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center }
+.actions form{ display:inline }
+.actions form .action{ display:inline-flex }
 
 .action{
   display:inline-flex; align-items:center; gap:6px;
   padding:8px 12px; border-radius:12px; font-weight:800;
   text-decoration:none; cursor:pointer; border:1px solid transparent;
 }
-.action i{font-size:18px}
-
-/* Paleta */
-.action.edit   { background:#dbeafe; border-color:#bfdbfe; color:#1e40af; } /* azul suave */
-.action.view   { background:#e0f2fe; border-color:#bae6fd; color:#0e7490; } /* celeste */
-.action.delete { background:#fee2e2; border-color:#fecaca; color:#991b1b; } /* rojo suave */
-
+.action i{ font-size:18px }
+.action.edit   { background:#dbeafe; border-color:#bfdbfe; color:#1e40af; }
+.action.view   { background:#e0f2fe; border-color:#bae6fd; color:#0e7490; }
+.action.delete { background:#fee2e2; border-color:#fecaca; color:#991b1b; }
 .action:hover{ filter:brightness(.97) }
 
-/* ===== DASHBOARD LISTAS TIPO CUADROS ===== */
-.info-list{
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  margin-top:10px;
-}
-
+/* =========================================================
+   14) Dashboard — listas de alerta
+   ========================================================= */
+.info-list{ display:flex; flex-direction:column; gap:8px; margin-top:10px }
 .info-item{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  background:#f8fafc;
-  border:1px solid var(--line);
-  padding:10px 12px;
-  border-radius:12px;
-  font-size:14px;
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  background:#f8fafc; border:1px solid var(--line); padding:10px 12px; border-radius:12px; font-size:14px;
+}
+.info-item .left{ display:flex; flex-direction:column; gap:2px }
+.info-item .title{ font-weight:800; color:#0f172a }
+.info-item .sub{ font-size:12px; color:var(--muted) }
+
+/* =========================================================
+   15) Componentes Blade — variantes nuevas (UI-04)
+   Reglas aprobadas explícitamente: la única CSS nueva de este
+   sprint, estrictamente para soportar las APIs de x-badge,
+   x-button y x-empty-state. Nada de lo anterior se modificó.
+   ========================================================= */
+
+/* x-badge variant="critical" — uso muy limitado, ver docs/design-system.md §3 */
+.badge.critical{ background:var(--badge-critical-bg); color:var(--danger-dark) }
+
+/* x-button variant="ghost" — misma geometría que .btn-outline, sin fondo ni borde */
+.btn-ghost{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 14px; border-radius:10px; font-weight:700;
+  background:transparent; border:0; color:var(--action);
+  text-decoration:none; cursor:pointer;
+}
+.btn-ghost:hover{ text-decoration:underline }
+
+/* Estado deshabilitado de botones (x-button :disabled) — tratamiento estándar,
+   sin color nuevo, solo atenuación de lo que cada variante ya usa. */
+.btn:disabled, .btn-outline:disabled, .btn-ghost:disabled{
+  opacity:.5; cursor:not-allowed; filter:none; pointer-events:none;
 }
 
-.info-item .left{
-  display:flex;
-  flex-direction:column;
-  gap:2px;
+/* x-empty-state :compact — fila compacta sin tarjeta propia, se apoya en el
+   contenedor que la envuelve. Aprobada explícitamente para el caso del
+   Dashboard ("✅ No hay productos vencidos"). El .empty-box original (usado
+   por Reportes hoy) no cambia. */
+.empty-state--compact{
+  display:flex; align-items:center; gap:8px;
+  font-size:13px; color:var(--muted);
 }
+.empty-state--compact i{ color:var(--badge-success-text); font-size:16px }
 
-.info-item .title{
-  font-weight:800;
-  color:#0f172a;
-}
-
-.info-item .sub{
-  font-size:12px;
-  color:var(--muted);
-}
-
-.badge{
-  font-weight:800;
-  font-size:12px;
-  padding:4px 8px;
-  border-radius:999px;
-  background:#eef2ff;
-  color:#3730a3;
-  white-space:nowrap;
-}
-.badge.danger{
-  background:#fee2e2;
-  color:#991b1b;
-}
-.badge.warn{
-  background:rgba(242,125,114,.12);
-  color:#b45309;
-}
-.badge.ok{
-  background:rgba(196,230,176,.35);
-  color:#166534;
+/* =========================================================
+   16) Errores de campo (UI-04A)
+   ========================================================= */
+/* Texto de ayuda debajo de un input con error, vía @error de Blade.
+   Mismo tamaño que el resto de textos secundarios del sistema (12px,
+   ver .info-item .sub / .sugg-sub) y el token de color de error ya
+   existente (--accent). No es el sistema de formularios completo de
+   docs/design-system.md §10 (bordes/foco de input) — eso queda para
+   su propio sprint; esto es únicamente el texto del mensaje. */
+.field-error{
+  display:block; margin-top:4px;
+  font-size:12px; color:var(--accent);
 }

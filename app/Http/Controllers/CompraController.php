@@ -8,9 +8,11 @@ use App\Models\Proveedor;
 use App\Models\Producto;
 use App\Models\Lote;
 use App\Models\MovimientoStock;
+use App\Support\FormRecovery;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
 class CompraController extends Controller
@@ -41,9 +43,18 @@ class CompraController extends Controller
             'nombre'=>$pr->nombre,
         ])->values();
 
+        // Reconstrucción tras un error de validación (PEND-08): si venimos de
+        // un submit fallido, old('items') trae los datos crudos (solo ids);
+        // se enriquecen acá con el nombre del producto para no depender de
+        // que el array PRODUCTOS del cliente esté completo/actualizado.
+        $oldItems = FormRecovery::items('items', ['producto_id' => Producto::class]);
+        $oldProveedorNombre = FormRecovery::label('proveedor_id', Proveedor::class);
+        $fieldErrors = FormRecovery::fieldErrors();
+
         return view('compras.create', compact(
             'proveedores','productos',
-            'productosForJs','proveedoresForJs'
+            'productosForJs','proveedoresForJs',
+            'oldItems','oldProveedorNombre','fieldErrors'
         ));
     }
 
@@ -73,7 +84,7 @@ class CompraController extends Controller
                 // 'observacion' => $data['observacion'] ?? null,
             ]);
 
-            foreach ($data['items'] as $it) {
+            foreach ($data['items'] as $i => $it) {
 
                 $productoId = (int)$it['producto_id'];
                 $nroLote    = trim($it['nro_lote']);
@@ -81,9 +92,13 @@ class CompraController extends Controller
                 $costo      = (float)$it['costo_unitario'];
                 $vence      = $it['fecha_vencimiento'] ?? null;
 
-                // si el lote ya tiene fecha de vencimiento se tiene que bloquear
+                // si el lote ya tiene fecha de vencimiento se tiene que bloquear.
+                // Es un error corregible por el usuario (PEND-08): se trata como
+                // fallo de validación (conserva old()/errors), no como abort().
                 if ($vence && Carbon::parse($vence)->isPast()) {
-                    abort(422, "El lote {$nroLote} está vencido. No puedes ingresarlo.");
+                    throw ValidationException::withMessages([
+                        "items.$i.fecha_vencimiento" => "El lote {$nroLote} está vencido. No puedes ingresarlo.",
+                    ]);
                 }
 
                 // buscamos si ya existe ese nro_lote para ese producto
