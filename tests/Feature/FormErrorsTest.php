@@ -43,8 +43,15 @@ test('login con credenciales invalidas muestra el banner una sola vez', function
 });
 
 test('un formulario autenticado (crear rol) muestra el banner global una sola vez ante datos invalidos', function () {
-    // rols.store no tiene middleware de permiso propio, basta con estar autenticado.
+    // Desde BUG-12, rols.store exige rols.crear, y el redirect tras el error
+    // vuelve a /rols (referer), que exige rols.ver.
+    $rol = \App\Models\Rol::create(['nombre' => 'Administrador', 'slug' => 'admin']);
+    $permisoVer = \App\Models\Permiso::create(['slug' => 'rols.ver', 'nombre' => 'Ver roles']);
+    $permisoCrear = \App\Models\Permiso::create(['slug' => 'rols.crear', 'nombre' => 'Crear rol']);
+    $rol->permisos()->attach([$permisoVer->id, $permisoCrear->id]);
+
     $user = crearUsuarioDePrueba();
+    $user->rols()->attach($rol->id);
 
     $response = $this->actingAs($user)
         ->from('/rols')

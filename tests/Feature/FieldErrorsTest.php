@@ -35,7 +35,9 @@ test('productos: campo codigo vacio muestra el error debajo del input', function
 });
 
 test('roles: campo nombre vacio muestra el error con la clase field-error', function () {
-    $user = crearUsuarioDePrueba();
+    // Necesita rols.ver además de rols.crear (BUG-12): al fallar la
+    // validación, Laravel vuelve a /rols (referer), que ahora exige .ver.
+    $user = crearUsuarioConPermisosFieldErrors(['rols.crear', 'rols.ver']);
 
     $response = $this->actingAs($user)->from('/rols')->followingRedirects()->post('/rols', [
         'nombre' => '',

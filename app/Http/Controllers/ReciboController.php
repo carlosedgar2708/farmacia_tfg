@@ -36,7 +36,9 @@ class ReciboController extends Controller
      */
     public function show(Recibo $recibo)
     {
-        //
+        $recibo->load('venta.cliente', 'venta.user', 'venta.detalles.producto');
+
+        return view('recibos.show', compact('recibo'));
     }
 
     /**

@@ -14,8 +14,9 @@
 | Proveedores | Completo | `ProveedorController` | `/proveedors` | `proveedors/index.blade.php` |
 | Usuarios | Completo | `UserController` | `/users` | `users/index.blade.php` |
 | Roles | Completo | `RolController` | `/rols` | `rols/index.blade.php` |
+| Configuración | Completo | `ConfiguracionController` | `/configuracion` | `configuracion/edit.blade.php` |
 | Permisos | Esqueleto | `PermisoController` | `/permiso` | (ninguna) |
-| Recibos | Esqueleto | `ReciboController` | (ninguna) | (ninguna) |
+| Recibos | Completo (solo `show`) | `ReciboController` | `GET /recibos/{recibo}` | `recibos/show.blade.php` |
 | Devoluciones | Esqueleto | `DevolucionController` | (ninguna) | (ninguna) |
 | Reportes | Completo | `ReporteController` | `/reportes` | `reportes/index.blade.php` + 6 subvistas |
 | Movimientos de Stock (vista) | Completo | `ReporteController::movimientos()` | `GET /reportes/movimientos` | `reportes/movimientos.blade.php` |
@@ -25,7 +26,7 @@
 ## Módulo: Autenticación
 
 ### Descripción
-Gestiona el ciclo de vida de la sesión del usuario: acceso al sistema, cierre de sesión y recuperación de contraseña.
+Gestiona el ciclo de vida de la sesión del usuario: acceso al sistema y cierre de sesión. La recuperación de contraseña **no está activa** (ver nota abajo).
 
 ### Tecnología
 Laravel Fortify con vistas Blade personalizadas configuradas en `app/Providers/FortifyServiceProvider.php`.
@@ -36,10 +37,12 @@ Laravel Fortify con vistas Blade personalizadas configuradas en `app/Providers/F
 - `POST /logout` → destruye la sesión (ruta `logout`, formulario POST en el sidebar)
 - `GET /register` → formulario de registro (`auth/register.blade.php`)
 - `POST /register` → `Actions/Fortify/CreateNewUser.php` valida y crea el usuario
-- `GET /forgot-password` → formulario de recuperación
-- `POST /forgot-password` → envía email de restablecimiento
-- `GET /reset-password/{token}` → formulario para nueva contraseña
-- `POST /reset-password` → `ResetUserPassword.php` actualiza la contraseña
+
+### Recuperación de contraseña — deshabilitada
+
+`Features::resetPasswords()` **no está incluida** en el array `features` de `config/fortify.php` (a diferencia de `registration`, `updateProfileInformation`, `updatePasswords`, `twoFactorAuthentication`, que sí lo están). Por eso Fortify no registra ninguna ruta `password.request`/`password.email`/`password.reset`/`password.update` — confirmado con `route:list` — y ningún link de la UI apunta a `/forgot-password`. Las vistas `auth/forgot-password.blade.php` y `auth/reset-password.blade.php` existen en el proyecto pero son **inalcanzables** (código huérfano, análogo a `resources/views/lotes/index.blade.php`, ver `PEND-07`). Ambas tenían además el mismo bug de `BUG-10` (`@extends('layouts.app')`, layout inexistente); se corrigió (`@extends('app')`) para que no queden como bug latente si la feature se habilita en el futuro, pero no se activó la funcionalidad ni se migraron al Design System.
+
+**Migrado al Design System en `UI-05` (2026-07-27):** decisión de `UI-02` (una columna vs. split-screen) resuelta a favor de **una columna** — se eliminó el layout ilustrado de `login.blade.php` (imagen, degradado, sombra `0 30px 80px`, radius 28px, `:root` local duplicando tokens ya globales) en favor de `<x-card class="login-card">` centrada, mismo criterio del resto del sistema. `register.blade.php` (ya usaba `.hero`/`.panel` decorativo) migrado al mismo patrón: `<x-card title="Crear cuenta" icon="ri-user-add-line">`, botones → `<x-button>`. Las reglas de centrado (`.login-shell`/`.login-card`) se agregaron una sola vez a `public/css/style.css` (§17) por ser compartidas entre ambas vistas — el resto del CSS específico de login (`.field`, `.remember`, `.form-head`) sigue local a esa vista, sin necesidad real de compartirse. Sin cambios en Fortify ni en `CreateNewUser.php`.
 
 ### Limitaciones actuales
 - El formulario de registro no incluye el campo `username`, que es requerido (unique) en la tabla `users`. El registro público puede fallar.
@@ -210,8 +213,12 @@ Registro de despacho de productos a clientes. Ver documento `flujo_venta.md` par
 
 **Nota:** La ruta `lotesPorProducto` está registrada pero actualmente no se usa en las vistas (la vista carga todos los lotes en el JSON inicial de PHP).
 
+**Cierre de `RF10`/`CU11` (2026-07-28):** `VentaController::store()` captura el `id` del `Recibo` ya creado (sin tocar ningún cálculo de `$total`/FEFO/stock) y lo agrega al redirect: `->with('recibo_id', $reciboId)`. Detalle completo en la nueva sección "Módulo: Recibos" más abajo.
+
 ### Vista de Listado (`ventas/index.blade.php`)
 Tabla paginada con: ID, fecha, cliente (o "—" si es público general), usuario que registró, chip de estado, y total calculado (`Venta::getTotalAttribute()`). No tiene panel de detalles expandible por venta (corrección a esta documentación, que lo mencionaba y no existe en el código actual — mismo tipo de inexactitud ya corregida antes en la documentación de Compras).
+
+**Acciones tras registrar una venta (2026-07-28, `RF10`/`CU11`):** si `session('recibo_id')` está presente (lo setea `VentaController::store()` justo después de crear la venta), se muestra un bloque con `<x-button icon="ri-receipt-line">Ver recibo</x-button>` y `<x-button variant="secondary" icon="ri-add-line">Nueva venta</x-button>` debajo del banner de éxito — **sin redirigir automáticamente** al recibo, para no interrumpir el flujo de caja del vendedor (decisión explícita del usuario: el cajero normalmente sigue registrando ventas). Es un flash de un solo uso — desaparece en la siguiente navegación. Deliberadamente **no** se tocó el banner global de `app.blade.php` (que es genérico para todo el sistema); el bloque vive únicamente en esta vista.
 
 **Chip de estado — hallazgo funcional (`BUG-11`, sin corregir):** la vista mapea `estado` a un color (`pagada`→verde, `pendiente`→ámbar, `anulada`→rojo, cualquier otro valor→neutral), pero `VentaController::store()` siempre guarda `'confirmada'`, que no está en ese mapa — hoy el chip **siempre** se muestra en su variante neutral. Ver `docs/pendientes.md`.
 
@@ -223,10 +230,44 @@ El formulario más complejo del sistema:
 - Campo de descuento visible solo para administradores.
 - Cálculo en tiempo real del total.
 - Búsqueda de cliente con autocomplete y modal de creación rápida.
-- Sección de recibo (tipo comprobante, folio, monto recibido, cambio) — no completamente funcional.
+- Sección de recibo (tipo comprobante, folio, monto recibido, cambio) — visual únicamente, estos campos no se persisten en `Recibo` (no son parte de su `fillable`); no completamente funcional.
 - Reconstrucción de la tabla y errores por fila tras un fallo de validación/regla de negocio (`PEND-08`, ver `docs/pendientes.md`).
 
-**Migrada al Design System en `UI-05` (2026-07-24):** los 3 `.card` (`.venta-left` sin encabezado propio, "Datos de la venta", "Realizar venta") → `<x-card>` (los dos últimos con `title`/`icon`). Todos los botones Blade (Agregar, Cancelar venta, Nuevo cliente, Público en general, Aceptar, Imprimir recibo, y los del modal Nuevo cliente) → `<x-button>` con su variante. El botón "Imprimir recibo" usaba un emoji (🧾) en el texto en vez de un ícono Remix — se resolvió con `icon="ri-printer-line"`, mismo criterio que el encabezado de `compras/create.blade.php`. **Sin cambios:** autocomplete de productos/clientes, cálculos, FEFO (vive en `VentaController`, no en esta vista), `OLD_ITEMS`/`FIELD_ERRORS`, el botón de eliminar fila (generado por JS), los badges `.badge-ok`/`.badge-bad` del dropdown de sugerencias (también generados por JS), y los campos sin estilo propio (`select`/`input` de tipo de comprobante y folio, diferidos al sprint de "Formularios"). Se detectó `.row` como clase huérfana (sin ninguna regla en `public/css/style.css`) — documentada, no corregida por no ser parte del alcance. `VentaController` sin ningún cambio.
+**Migrada al Design System en `UI-05` (2026-07-24):** los 3 `.card` (`.venta-left` sin encabezado propio, "Datos de la venta", "Realizar venta") → `<x-card>` (los dos últimos con `title`/`icon`). Todos los botones Blade (Agregar, Cancelar venta, Nuevo cliente, Público en general, Aceptar, y los del modal Nuevo cliente) → `<x-button>` con su variante. **Sin cambios:** autocomplete de productos/clientes, cálculos, FEFO (vive en `VentaController`, no en esta vista), `OLD_ITEMS`/`FIELD_ERRORS`, el botón de eliminar fila (generado por JS), los badges `.badge-ok`/`.badge-bad` del dropdown de sugerencias (también generados por JS), y los campos sin estilo propio (`select`/`input` de tipo de comprobante y folio, diferidos al sprint de "Formularios"). Se detectó `.row` como clase huérfana (sin ninguna regla en `public/css/style.css`) — documentada, no corregida por no ser parte del alcance. `VentaController` sin ningún cambio.
+
+**Botón "Imprimir recibo" eliminado (2026-07-28, `RF10`/`CU11`):** este botón (`id="btnTicket"`) no tenía ningún `addEventListener` ni llamaba a `window.print()` — era código muerto, confirmado por auditoría antes de tocarlo. Además, este formulario se completa *antes* de que la venta (y su recibo) existan, así que no había forma correcta de que "imprimiera" nada real. Se eliminó el botón y su referencia JS muerta (`$btnTicket`, `hayItems()`). La impresión real ahora vive en `recibos/show.blade.php`, accesible después de registrar la venta vía el botón "Ver recibo" de `ventas/index.blade.php`.
+
+---
+
+## Módulo: Recibos
+
+### Descripción
+Consulta e impresión del comprobante de una venta ya registrada. Cierra `RF10`/`CU11`. Implementado con el alcance mínimo necesario — no es un módulo de gestión de recibos (sin listado, edición, eliminación, búsqueda, numeración automática ni estados).
+
+### Rutas (dentro del grupo `auth`, sin permiso granular — mismo criterio que `ventas.*`)
+
+| Método | Ruta | Acción |
+|---|---|---|
+| GET | `/recibos/{recibo}` | `ReciboController::show()` |
+
+### Flujo completo (2026-07-28)
+
+1. El vendedor registra una venta normalmente (`ventas/create.blade.php`) — sin cambios en FEFO, stock, descuentos ni validaciones.
+2. `VentaController::store()` crea la `Venta` y el `Recibo` (ya resuelto en `PEND-01`), captura su `id` sin tocar ningún cálculo, y redirige a `ventas.index` con `->with('recibo_id', $reciboId)` además del flash de éxito habitual.
+3. **Sin redirección forzada al recibo** — decisión explícita del usuario: el cajero normalmente sigue registrando ventas, no se lo interrumpe.
+4. `ventas/index.blade.php` muestra, solo si `session('recibo_id')` está presente, los botones "Ver recibo" y "Nueva venta" debajo del banner de éxito. Es un flash de un solo uso.
+5. `ReciboController::show()` carga `venta.cliente`, `venta.user`, `venta.detalles.producto` (evita N+1) y renderiza `recibos/show.blade.php`.
+6. La vista muestra número de recibo (`Recibo::id`, no hay numeración propia — coincide con lo pedido), fecha, cliente (`—` si es público general, mismo criterio que el resto del sistema), vendedor, tabla de productos/cantidad/precio unitario/subtotal, y el total (`Recibo::monto`, ya persistido correctamente desde `PEND-01`, incluye descuento si aplicó). Reutiliza `<x-card>`, `<x-button>` y las clases `.table`/`.table-wrap`/`.money`/`.ta-right` ya existentes — sin CSS nuevo salvo el punto siguiente.
+7. Botón "Imprimir" (`<x-button onclick="window.print()">`) — verificado que dispara `window.print()` (revisado el atributo `onclick` real, sin ejecutar el diálogo nativo dentro de la sesión de automatización del navegador, que lo habría bloqueado).
+
+### `@media print` (único CSS nuevo, agregado localmente en `recibos/show.blade.php` vía `@push('styles')`)
+Oculta `.sidebar`, `.main-top`, `.flash`, `footer` y `.print-actions` (el propio botón "Imprimir"); resetea el padding/margin de `.main` a 0. Sin cambios de color ni tipografía. Verificado que los 6 selectores corresponden a elementos reales de `app.blade.php`/la vista.
+
+### Verificación
+
+- `tests/Feature/RecibosTest.php` (nuevo, 6 casos): flujo completo (venta → recibo persistido → redirect a `ventas.index` → botones "Ver recibo"/"Nueva venta" presentes con el enlace correcto), datos del recibo (número, fecha, cliente, vendedor, producto, total), cliente nulo muestra "—", presencia del `@media print` y sus selectores, botón "Imprimir recibo" del formulario de venta confirmado eliminado, acceso sin sesión redirige a login.
+- Suite completa: 237 passed, mismo único fallo preexistente no relacionado (`ExampleTest`).
+- **Verificación manual contra MySQL real** (vía Chrome, `php artisan serve` temporal): login real, 2 ventas registradas de punta a punta desde la interfaz — en ambas apareció el banner con "Ver recibo"/"Nueva venta", el recibo abierto coincidió exactamente con los datos de cada venta (producto, cantidad, precio, total), el segundo "Ver recibo" apuntó al recibo correcto (no al anterior), y volver a `/ventas` para registrar una segunda venta no tuvo ninguna fricción. Se confirmó el `onclick="window.print()"` del botón y la presencia real de los 6 selectores del `@media print` sin ejecutar el diálogo de impresión (habría bloqueado la sesión de automatización). Datos de prueba limpiados de la BD real al finalizar (ventas, detalles, recibos, movimientos revertidos; stock restaurado a sus valores originales).
 
 ---
 
@@ -294,6 +335,8 @@ Gestión de las cuentas de acceso al sistema.
 - `update()`: si el campo `password` viene vacío, no actualiza la contraseña (la deja igual).
 - `destroy()`: impide que el usuario elimine su propia cuenta.
 
+**Migrada al Design System en `UI-05`:** `<section class="hero"><div class="panel">` → `<x-card>` (mismo criterio que Roles); alertas de sesión → `<x-alert>`; botón "Nuevo usuario" → `<x-button variant="primary">`; fila `@empty` → `<x-empty-state>`; botones de ambos modales (Guardar/Cancelar/Cerrar) → `<x-button>`. Buscador ya migrado en `UI-06`. **Sin cambios:** `UserController`, el modal (JS de crear/editar/ver), la tabla, `@error()` de `UI-04A`.
+
 ---
 
 ## Módulo: Roles
@@ -315,7 +358,26 @@ La vista `rols/index.blade.php` presenta una tabla de roles con sus permisos aso
 ### Bug Crítico — ✅ Corregido (ver `BUG-01` en `docs/pendientes.md`, 2026-07-07)
 Esta sección indicaba que `RolController::store()` y `update()` no sincronizaban los permisos seleccionados. Al auditar el controlador durante la migración `UI-05` (2026-07-24) se confirmó que **ambos métodos ya llaman a `$rol->permisos()->sync($request->input('permisos', []))`** — el bug fue corregido el 2026-07-07 (`BUG-01`, marcado como tal en `docs/pendientes.md`) pero esta sección de `modulos.md` nunca se había actualizado para reflejarlo. Se corrige acá esa desactualización.
 
+### Bug Crítico de seguridad — ✅ Corregido (ver `BUG-12` en `docs/pendientes.md`, 2026-07-28)
+Detectado durante la auditoría de consistencia entre la memoria de tesis y el código: las rutas `rols.*` (`GET/POST/PUT/DELETE /rols`) estaban registradas vía `Route::resource(...)->only([...])` **sin ningún middleware `permiso:`**, a diferencia de todos los demás módulos administrativos (Productos, Compras, Clientes, Proveedores, Usuarios, Reportes). `RolController` tampoco tenía ninguna verificación interna (`esAdmin()`/`tienePermiso()`), y la vista no ocultaba ningún botón. Efecto real: cualquier usuario autenticado, incluido un Vendedor, podía gestionar roles y permisos — incluyendo asignarse a sí mismo cualquier permiso. Corregido aplicando el mismo patrón de middleware por ruta que ya usan Usuarios/Clientes/Proveedores (`permiso:rols.ver/crear/editar/eliminar`, slugs ya sembrados en `PermisoSeeder`). Verificado con la suite completa y manualmente contra la BD real con `admin@farmacia.com` (200) y `vendedor@farmacia.com` (403). El ocultamiento de botones según permiso en la vista y en el sidebar se dejó **fuera de este fix**, a la espera de un sprint de UX/RBAC que unifique ese patrón también en Productos/Clientes/Proveedores (hoy tampoco lo tienen). Detalle completo en `docs/pendientes.md` (`BUG-12`).
+
 **Migrada al Design System en `UI-05` (2026-07-24):** el bloque decorativo `<div class="hero">` (fondo azul con `style="background:#1157c2;color:#fff"`) → `<x-card>`. Las clases `.hero`, `.grid`, `.shadow`, `.bubble`/`.b1`-`.b5` no tenían ninguna regla en `style.css` (verificado por grep): el efecto de "burbujas" decorativas nunca llegó a implementarse, solo el `style` inline producía algún efecto visual, así que se eliminó todo ese marcado muerto junto con el `<div class="shadow">` y los 5 `<span class="bubble">`. Botón "Nuevo rol" y botones del modal (Guardar/Cancelar) → `<x-button>`. Estado vacío (`.empty`) → `<x-empty-state>`. **Corregido como bug de marcado, no como cambio de diseño:** la columna de acciones tenía un `<td>` anidado dentro de otro `<td>` (HTML inválido, tolerado silenciosamente por los navegadores vía cierre implícito de etiquetas) — se corrigió a un único `<td>`. **Eliminado como limpieza de código muerto:** el `<script src="{{ asset('js/rols.js') }}">` y la línea `window.routesRolsStore = "..."` del `@push('scripts')`. El archivo `public/js/rols.js` **nunca existió** en el proyecto (ni el archivo ni el directorio `public/js/`), por lo que cada carga de `/rols` producía un 404 silencioso; toda la funcionalidad del modal (crear/editar/ver, autogeneración de slug, cierre al hacer click fuera) ya estaba implementada en el `<script>` inline de la misma vista, así que su eliminación no cambia ningún comportamiento. **Sin cambios:** `RolController` completo, el modal, el buscador (ya migrado en `UI-06`), la tabla y `.h-top` del encabezado (se quitó únicamente `color:#fff`, que habría dejado el texto invisible sobre el nuevo fondo blanco del `<x-card>`). Pruebas: `tests/Feature/RolesIndexTest.php` (nuevo, 8 casos) + `tests/Feature/RolesBuscadorTest.php` (`UI-06`, 3 casos).
+
+---
+
+## Módulo: Configuración
+
+### Descripción
+Permite al administrador ajustar parámetros globales del sistema almacenados en la tabla clave/valor `configuraciones` (ver `Configuracion::obtener()`/`establecer()`). Hoy solo expone `dias_alerta_vencimiento`.
+
+### Rutas (prefijo `/configuracion`, solo admins vía `esAdmin()`)
+
+| Método | Ruta | Acción |
+|---|---|---|
+| GET | `/configuracion` | `ConfiguracionController::edit()` |
+| PUT | `/configuracion` | `ConfiguracionController::update()` |
+
+**Migrada al Design System en `UI-05` (2026-07-27):** `<div class="hero"><div class="panel" style="background:#1157c2;color:#fff">` → `<x-card title="Configuración del sistema" icon="ri-settings-3-line">` (a diferencia de los listados administrativos, el encabezado decorativo aquí era un `<h1>` de uso único, sin la clase `page-title` compartida por el resto del sistema, así que se colapsó en el prop `title` del card en vez de dejarlo fuera). Alerta de éxito → `<x-alert variant="success">`. Botón "Guardar" → `<x-button variant="primary">`. **Sin cambios:** `ConfiguracionController`, el campo `dias_alerta_vencimiento` y su `@error()` (`UI-04A`).
 
 ---
 
@@ -340,14 +402,6 @@ Gestión del catálogo de permisos disponibles en el sistema.
 
 ## Módulos Esqueleto (sin implementar)
 
-### Recibos
-- **Modelo**: `Recibo` — existe, con relación a `Venta`.
-- **Migración**: existe, pero solo tiene `venta_id` (los campos del modelo como `nro_recibo`, `metodo_pago` no están en la BD).
-- **Controlador**: `ReciboController` — existe, todos los métodos vacíos.
-- **Rutas**: ninguna registrada.
-- **Vistas**: ninguna.
-- **Vinculación parcial**: `VentaController::store()` intenta crear un recibo al finalizar la venta, pero falla silenciosamente por el desajuste entre el modelo y la migración.
-
 ### Devoluciones
 - **Modelos**: `Devolucion` y `DetalleDevolucion` — existen.
 - **Migraciones**: existen, pero la mayoría de campos del `fillable` no están en las tablas.
@@ -362,4 +416,4 @@ Gestión del catálogo de permisos disponibles en el sistema.
 
 El sidebar de `app.blade.php` muestra los accesos a módulos condicionalmente usando `Route::has('nombre.index')`. Esto significa que si en algún momento una ruta no está registrada, su entrada desaparece del menú sin error.
 
-El sidebar incluye entradas para: Dashboard, Productos, Lotes, Proveedores, Clientes, Ventas, Roles y Usuarios. No hay entradas para Compras (debe accederse por URL directa o agregar el acceso al sidebar).
+El sidebar incluye entradas para: Dashboard, Productos, Proveedores, Clientes, Ventas, Reportes, Roles, Usuarios y Configuración (esta última solo si `esAdmin()`). **No hay entrada para Lotes** — el `@if (Route::has('lotes.index'))` de `app.blade.php` nunca es verdadero (no existe ninguna ruta con ese nombre; la gestión de lotes se hace vía el modal "Editar stock" de Productos, ver `PEND-07`), así que ese ítem nunca se renderiza pese a estar en el Blade. Tampoco hay entrada para Compras (debe accederse por URL directa o agregar el acceso al sidebar, ver `AUS-04`).

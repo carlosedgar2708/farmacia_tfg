@@ -65,6 +65,7 @@
                    data-id="{{ $p->id }}"
                    data-codigo="{{ $p->codigo }}"
                    data-nombre="{{ $p->nombre }}"
+                   data-precio_venta="{{ $p->precio_venta }}"
                    data-es_inyectable="{{ $p->es_inyectable ? 1 : 0 }}"
                    data-description="{{ $p->description }}">
                    <i class="ri-pencil-line"></i> Editar
@@ -132,6 +133,10 @@
       <label>Nombre *</label>
       <input type="text" name="nombre" id="f-nombre" required maxlength="255">
       @error('nombre') <small class="field-error">{{ $message }}</small> @enderror
+
+      <label>Precio de venta *</label>
+      <input type="number" name="precio_venta" id="f-precio" required min="0" step="0.01">
+      @error('precio_venta') <small class="field-error">{{ $message }}</small> @enderror
 
       <label style="display:flex;align-items:center;gap:8px;margin-top:8px">
         <input type="checkbox" name="es_inyectable" id="f-iny"> Es inyectable
@@ -277,6 +282,7 @@
   const f = {
     codigo: document.getElementById('f-codigo'),
     nombre: document.getElementById('f-nombre'),
+    precio: document.getElementById('f-precio'),
     iny:    document.getElementById('f-iny'),
     description: document.getElementById('f-description'),
   };
@@ -302,6 +308,7 @@
 
       f.codigo.value = btn.dataset.codigo || '';
       f.nombre.value = btn.dataset.nombre || '';
+      f.precio.value = btn.dataset.precio_venta || '';
       f.iny.checked  = (btn.dataset.es_inyectable === '1');
       f.description.value = btn.dataset.description || '';
 

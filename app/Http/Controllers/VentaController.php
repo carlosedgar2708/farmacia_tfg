@@ -87,7 +87,9 @@ class VentaController extends Controller
             'items.required' => 'Agrega al menos un renglón de venta.',
         ]);
 
-        DB::transaction(function () use ($data) {
+        $reciboId = null;
+
+        DB::transaction(function () use ($data, &$reciboId) {
 
             $venta = Venta::create([
                 'cliente_id'  => $data['cliente_id'] ?? null,
@@ -180,13 +182,16 @@ class VentaController extends Controller
             }
 
             if (method_exists($venta, 'recibo')) {
-                $venta->recibo()->create([
+                $recibo = $venta->recibo()->create([
                     'venta_id' => $venta->id,
                     'monto'    => $total,
                 ]);
+                $reciboId = $recibo->id;
             }
         });
 
-        return redirect()->route('ventas.index')->with('success','Venta registrada correctamente.');
+        return redirect()->route('ventas.index')
+            ->with('success', 'Venta registrada correctamente.')
+            ->with('recibo_id', $reciboId);
     }
 }

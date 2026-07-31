@@ -86,6 +86,7 @@ class ProductoController extends Controller
                     ->where(fn($q) => $q->whereNull('deleted_at'))
             ],
             'nombre'        => ['required', 'string', 'max:255'],
+            'precio_venta'  => ['required', 'numeric', 'min:0'],
             'es_inyectable' => ['sometimes', 'boolean'],
             'description'   => ['nullable', 'string'],
         ]);

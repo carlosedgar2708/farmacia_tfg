@@ -22,16 +22,18 @@ $rol->permisos()->sync($request->input('permisos', []));
 
 ---
 
-### BUG-02 — No se puede editar el precio de venta de un producto
+### BUG-02 — No se puede editar el precio de venta de un producto ✅ CORREGIDO (2026-07-27)
 
 **Módulo:** Productos
-**Archivo:** `app/Http/Controllers/ProductoController.php`
+**Archivo:** `app/Http/Controllers/ProductoController.php`, `resources/views/productos/index.blade.php`
 
-`ProductoController::update()` no incluye `precio_venta` en sus reglas de validación ni en los campos que actualiza. La vista tampoco tiene este campo en el modal de edición.
+`ProductoController::update()` no incluía `precio_venta` en sus reglas de validación ni en los campos que actualiza. La vista tampoco tenía este campo en el modal.
 
-**Efecto:** Una vez creado un producto, su precio de venta no puede modificarse desde la interfaz.
+**Hallazgo ampliado durante la corrección (más grave que lo documentado):** el modal de **creación** (mismo formulario, compartido con edición) tampoco tenía el campo `precio_venta`, pese a que `ProductoController::store()` ya lo exige como `required`. Verificado con una petición real (`POST /productos` sin `precio_venta`): la validación fallaba con "El campo precio de venta es obligatorio.", por lo que **crear un producto desde la UI ya estaba roto**, no solo editar el precio.
 
-**Corrección requerida:** Agregar `precio_venta` a la validación del `update()` y al formulario modal.
+**Corregido:** se agregó el input `precio_venta` (con su `@error()`) al modal compartido, se agregó `data-precio_venta` al botón "Editar" y su lectura en el JS de apertura del modal, y se agregó `precio_venta` a la validación/actualización de `ProductoController::update()` (mismas reglas que ya usaba `store()`). Sin cambios de lógica de negocio: se completó un campo que ya existía en el modelo, la migración y `store()`, simplemente ausente en la vista y en `update()`.
+
+**Verificado:** `tests/Feature/ProductosIndexTest.php` (+4 casos): creación con `precio_venta` persiste el valor, creación sin `precio_venta` falla la validación (reproduce el bug encontrado), edición actualiza `precio_venta`, el campo está presente en el HTML del formulario. Suite completa sin regresiones.
 
 ---
 
@@ -93,16 +95,16 @@ La acción de creación de usuarios de Fortify no maneja el campo `username`, qu
 
 ---
 
-### BUG-06 — `MovimientoStock::scopeSalidas()` nunca devuelve resultados
+### BUG-06 — `MovimientoStock::scopeSalidas()` nunca devolvía resultados ✅ CORREGIDO (2026-07-27)
 
 **Módulo:** Movimientos de Stock
 **Archivo:** `app/Models/MovimientoStock.php`
 
-El modelo define `scopeSalidas()` filtrando `cantidad < 0`, pero los movimientos de salida (ventas) se crean con `cantidad` siempre positiva en `VentaController::store()`. De igual forma, `scopeEntradas()` filtra `cantidad > 0`, lo que hace que ambos scopes devuelvan los mismos datos.
+El modelo definía `scopeSalidas()` filtrando `cantidad < 0`, pero los movimientos de salida (ventas) se crean con `cantidad` siempre positiva en `VentaController::store()`. De igual forma, `scopeEntradas()` filtraba `cantidad > 0`, lo que hacía que ambos scopes devolvieran los mismos datos.
 
-**Efecto:** Aunque los movimientos se guardan correctamente, no pueden consultarse de forma diferenciada por tipo usando los scopes del modelo.
+**Corregido:** ambos scopes ahora filtran por la columna `tipo` (`'Entrada'`/`'Salida'`, poblada correctamente por `CompraController`/`VentaController`) en vez del signo de `cantidad`. Se confirmó por búsqueda exhaustiva que ningún controlador ni vista llamaba a estos scopes (`ReporteController::movimientos()` ya los evitaba deliberadamente, filtrando `tipo` directamente — ver `AUS-01`/Reporte 6), así que el fix no tiene ningún efecto secundario sobre código existente.
 
-**Corrección requerida:** Cambiar la forma en que se guardan las salidas (cantidad negativa) o corregir los scopes para filtrar por el campo `tipo` en lugar de por el signo de `cantidad`.
+**Verificado:** `tests/Feature/MovimientoStockScopesTest.php` (nuevo): un movimiento `Entrada` y uno `Salida` con `cantidad` positiva en ambos — `scopeEntradas()`/`scopeSalidas()` los distinguen correctamente. Suite completa sin regresiones.
 
 ---
 
@@ -208,6 +210,62 @@ Pero `VentaController::store()` **siempre** guarda `'estado' => 'confirmada'` �
 
 ---
 
+### BUG-12 — El módulo de Roles no tiene ninguna protección de acceso real (RBAC anulado) ✅ CORREGIDO (2026-07-28)
+
+**Módulo:** Roles
+**Archivos:** `routes/web.php`, `app/Http/Controllers/RolController.php`, `resources/views/rols/index.blade.php`
+
+**Estado:** Corregido en la misma sesión en que se detectó, durante la auditoría de consistencia de la memoria de tesis.
+
+**Diagnóstico exacto (verificado leyendo cada capa, no asumido):**
+
+- `routes/web.php:100` registra `Route::resource('rols', RolController::class)->only(['index','store','update','destroy'])` **dentro** del grupo `Route::middleware('auth')` (líneas 51-142), pero **sin ningún `->middleware('permiso:rols.*')` encadenado** — a diferencia de Productos, Compras, Clientes, Proveedores, Usuarios y Reportes, que sí protegen cada ruta (o el grupo completo) con el middleware `permiso:`.
+- `RolController.php` no compensa la ausencia de middleware: ninguno de sus métodos (`index`, `store`, `update`, `destroy`) llama a `esAdmin()` ni a `tienePermiso()`.
+- No existe ningún `Gate::` definido en `app/Providers/`, y `bootstrap/app.php` solo registra el alias `permiso` sin aplicarlo de forma global.
+- `resources/views/rols/index.blade.php` tampoco oculta ningún control según permiso: el botón "Nuevo rol" (línea 32), los botones "Editar"/"Ver" (líneas 221-246) y el formulario "Eliminar" (línea 249) son incondicionales — a diferencia de `resources/views/users/index.blade.php`, que sí envuelve sus botones equivalentes en `@if(auth()->user()->tienePermiso(...))`.
+- Los permisos `rols.ver`, `rols.crear`, `rols.editar`, `rols.eliminar` **ya existen** en el catálogo (`database/seeders/PermisoSeeder.php:36-39`) y están asignados al rol Administrador (`sync()` de todos los permisos), pero ningún punto del código los verifica jamás.
+- Confirmado en los propios tests: el comentario de `tests/Feature/RolesBuscadorTest.php:9` dice literalmente *"rols.index no tiene middleware de permiso propio, basta con estar autenticado"* — la ausencia de protección ya era conocida (o al menos observada) al escribir ese test, sin haberse registrado como bug hasta ahora.
+
+**Efecto:** cualquier usuario autenticado, incluido un Vendedor real (sin ningún permiso `rols.*`), puede listar todos los roles con sus permisos, crear roles nuevos, editar cualquier rol existente — incluyendo asignarle todos los permisos disponibles, por ejemplo a su propio rol — y eliminar cualquier rol, incluido el de Administrador. **Es una vía de escalación de privilegios**, no solo una inconsistencia de documentación: contradice directamente `RF03`/`CU03`/`CU04` de la memoria de tesis, que describen "Gestionar roles" y "Asignar permisos a roles" como operaciones exclusivas del actor Administrador.
+
+**Corrección aplicada (solo la brecha de seguridad; el resto queda explícitamente diferido):**
+- `routes/web.php`: se reemplazó `Route::resource('rols', RolController::class)->only([...])` por rutas explícitas, mismo patrón que Usuarios/Clientes/Proveedores: `GET /rols` → `permiso:rols.ver`, `POST /rols` → `permiso:rols.crear`, `PUT /rols/{rol}` → `permiso:rols.editar`, `DELETE /rols/{rol}` → `permiso:rols.eliminar`. Los 4 slugs ya existían en `PermisoSeeder.php`, no se sembró nada nuevo.
+- `RolController.php`: sin cambios — no necesita verificación interna, igual que Usuarios/Clientes/Proveedores, ya cubiertos solo por el middleware de ruta.
+- **Deliberadamente sin cambios (decisión explícita del usuario, para no ampliar el alcance de una corrección de seguridad puntual):** `rols/index.blade.php` sigue sin ocultar botones según permiso (`@if(tienePermiso(...))`, patrón que hoy solo usa `users/index.blade.php`). Productos, Clientes y Proveedores tampoco lo hacen — queda como un sprint futuro de UX/RBAC uniforme para todo el sistema, no solo para Roles. El sidebar (`app.blade.php`) tampoco se tocó: su enlace "Roles" sigue mostrado vía `Route::has('rols.index')`, exactamente igual que Usuarios/Productos/Proveedores/Clientes (ninguno de esos enlaces está filtrado por permiso; la única excepción de todo el sistema es "Configuración"). No tocar el sidebar no reintroduce el bug: el acceso ya está bloqueado por el middleware aunque el enlace sea visible.
+- **Tests actualizados:** `tests/Feature/RolesIndexTest.php` y `tests/Feature/RolesBuscadorTest.php` autenticaban usuarios sin ningún rol asignado — se les agregó un rol Administrador con los 4 permisos `rols.*` (mismo patrón que `ProveedoresIndexTest.php`), más un rol Vendedor sin ellos para el caso negativo. Se agregó un test nuevo en cada archivo ("acceso sin permiso rols.ver es bloqueado con 403"). También se corrigieron dos tests de otros archivos que dependían de la ausencia de protección: `FieldErrorsTest.php` ("roles: campo nombre vacío...") y `FormErrorsTest.php` ("un formulario autenticado (crear rol)...") — ambos autenticaban un usuario sin rol y ahora necesitan `rols.crear`/`rols.ver` para no recibir 403 antes de llegar a la validación.
+- El test "sin roles se muestra el estado vacío" de `RolesIndexTest.php` ya no puede vaciar la tabla `rols` por completo (`Rol::query()->delete()`), porque el propio rol del administrador de la prueba pasaría a no existir y el admin perdería `rols.ver` — se cambió a filtrar con una búsqueda sin resultados (`?q=inexistente-xyz`), que ejercita el mismo estado vacío del Design System sin depender de borrar el rol necesario para la propia autenticación.
+
+**Verificado:**
+- Suite completa: `php artisan test` → 239 passed, 1 failed (`ExampleTest`, mismo fallo preexistente no relacionado, sin conexión con este cambio).
+- Verificación manual contra la base de datos real (`farmacia_tfg`, vía `php artisan serve` temporal + `curl` con las cuentas reales del seeder): login como `admin@farmacia.com` → `GET /rols` responde `200` con el contenido real de la vista ("LISTA DE ROLES"); login como `vendedor@farmacia.com` → `GET /rols` responde `403` con el cuerpo "No autorizado" del `PermisoMiddleware`. Servidor temporal detenido y cookies de sesión eliminadas al finalizar.
+
+**Nota para trabajo futuro (no forma parte de este fix):** el gating de botones por permiso en la vista (`tienePermiso()`) sigue sin ser un patrón uniforme del sistema — solo `users/index.blade.php` lo implementa hoy. Si se decide generalizarlo, debería abordarse en un sprint dedicado que toque Productos, Clientes, Proveedores y Roles a la vez, no solo uno de ellos.
+
+---
+
+### BUG-13 — Los permisos `clientes.*` nunca se sembraron, pese a que las rutas ya los exigían ✅ CORREGIDO (2026-07-28)
+
+**Módulo:** Clientes / RBAC
+**Archivos:** `database/seeders/PermisoSeeder.php`, `database/seeders/RolSeeder.php`
+
+**Estado:** Corregido en la misma sesión en que se detectó, durante la auditoría de consistencia del Capítulo 3 de la memoria de tesis (CU15 "Asociar cliente a una venta").
+
+**Diagnóstico exacto:** `routes/web.php` protege `/clientes` con `permiso:clientes.ver`, `permiso:clientes.crear`, `permiso:clientes.editar` y `permiso:clientes.eliminar` (confirmado en las 4 rutas del prefijo `clientes.`). Sin embargo, `PermisoSeeder.php` **nunca definió ningún permiso con prefijo `clientes.`** — el módulo de Clientes es el único de todo el sistema sin su propia sección en el seeder de permisos (confirmado también en `docs/base_de_datos.md`, cuya tabla de "24 permisos" nunca incluyó una fila "Clientes"). El módulo solo era utilizable por el rol Administrador gracias al bypass total de `esAdmin()` en `PermisoMiddleware`; para cualquier otro rol era **imposible** otorgar acceso a Clientes, porque el permiso ni siquiera existía en la tabla `permisos` para asignarlo.
+
+**Efecto concreto detectado:** el rol Vendedor necesita poder registrar un cliente nuevo durante la venta (botón "Nuevo cliente" de `ventas/create.blade.php`, visible para cualquier usuario, que llama a `POST /clientes`). Sin el permiso `clientes.crear` sembrado, esa acción fallaba con 403 para `vendedor@farmacia.com` — contradiciendo `CU15` de la memoria de tesis ("Asociar cliente a una venta", actor Vendedor).
+
+**Corregido:**
+- `PermisoSeeder.php`: se agregó la sección `CLIENTES` con los 4 slugs ya exigidos por las rutas (`clientes.ver/crear/editar/eliminar`).
+- `RolSeeder.php`: se agregó `clientes.crear` a la lista de permisos del rol Vendedor (no `clientes.ver`/`editar`/`eliminar` — el Vendedor no gestiona el directorio de clientes, solo crea uno nuevo al vuelo durante la venta, igual que documenta `CU15`; el directorio completo sigue siendo exclusivo de Administrador vía `CU06`).
+- Se re-sembraron ambos seeders contra la base de datos real (`php artisan db:seed --class=PermisoSeeder` seguido de `--class=RolSeeder`, en ese orden).
+
+**Verificado:**
+- Catálogo de permisos: 29 en total (antes 25; el conteo de "24" que traía `docs/base_de_datos.md` ya estaba desactualizado desde antes de esta sesión).
+- `php artisan test`: 239 passed, 1 failed (`ExampleTest`, mismo fallo preexistente no relacionado) — los tests de Clientes/Proveedores no se ven afectados porque fabrican sus propios `Permiso`/`Rol` de prueba, independientes del seeder real.
+- Verificación manual contra la BD real: login como `vendedor@farmacia.com` (vía `php artisan serve` temporal + `curl`), `POST /clientes` con un cliente de prueba → `201 Created` (antes: `403`). El registro de prueba se eliminó de la BD real al finalizar (`forceDelete()`).
+
+---
+
 ## Problemas de Datos (asignaciones de roles/permisos, no bugs de código)
 
 ### DATA-01 — Rol "Supervisor 1" con permisos de proveedores incompletos
@@ -227,7 +285,7 @@ Estos no son bugs activos (no causan errores ahora mismo) pero causarán errores
 
 | ID | Modelo | Problema |
 |---|---|---|
-| ESQ-01 | `Recibo` | `fillable` incluye `nro_recibo`, `fecha`, `metodo_pago`, `observacion`, `estado`. Ninguno existe en la migración. |
+| ~~ESQ-01~~ | `Recibo` | ~~`fillable` incluía `nro_recibo`, `fecha`, `metodo_pago`, `observacion`, `estado`. Ninguno existe en la migración.~~ ✅ Corregido junto con `PEND-01` (2026-07-27) — `fillable` reducido a `venta_id`/`monto`, únicos campos reales. |
 | ESQ-02 | `Devolucion` | `fillable` incluye `venta_id`, `cliente_id`, `fecha_devolucion`, `observacion`, `estado`. Ninguno existe en la migración. |
 | ESQ-03 | `DetalleDevolucion` | `fillable` incluye `producto_id`, `precio_unitario`, `razon`. Ninguno existe en la migración. |
 | ESQ-04 | `Compra` | `fillable` incluye `observacion` y `estado`. Ninguno existe en la migración. |
@@ -240,15 +298,22 @@ Estos no son bugs activos (no causan errores ahora mismo) pero causarán errores
 
 ## Funcionalidades Incompletas (el módulo existe pero no está terminado)
 
-### PEND-01 — Recibos
+### PEND-01 — Recibos ✅ COMPLETO (persistencia 2026-07-27, `RF10`/`CU11` 2026-07-28)
 
-**Estado:** Solo el modelo y la migración existen. El controlador está vacío.
+**Diagnóstico exacto de por qué no persistía (verificado empíricamente, no asumido):**
+- La migración real de `recibos` solo tenía `id`, `venta_id` (FK única a `ventas`), `created_at`, `updated_at`.
+- El modelo `Recibo` usaba `SoftDeletes`, pero la migración **no tenía `deleted_at`** — el mismo bug que `BUG-09` (`MovimientoStock`), nunca detectado antes para este modelo porque nadie lo había leído hasta ahora. Confirmado con una consulta real: `SQLSTATE[HY000]: no such column: recibos.deleted_at`. Esto rompe **cualquier lectura** (`Recibo::count()`, `$venta->recibo`), no la escritura.
+- `VentaController::store()` ya llamaba a `$venta->recibo()->create(['venta_id' => .., 'monto' => $total])`. Se confirmó que la fila **sí se insertaba** (`venta_id` es fillable y existe), pero **sin `monto`** — no estaba en `$fillable` (que en cambio declaraba `nro_recibo`, `fecha`, `metodo_pago`, `observacion`, `estado`, ninguno existente en la migración) ni era una columna real, así que Eloquent lo descartaba en el mass-assignment.
+- **Efecto neto:** el recibo se creaba a medias (sin monto) y quedaba **ilegible para siempre** por el bug de `SoftDeletes` — cualquier vista o reporte que intentara leerlo habría lanzado un error 500 real.
 
-**Trabajo pendiente:**
-- Agregar los campos faltantes a la migración (`nro_recibo`, `fecha`, `metodo_pago`, `observacion`, `estado`) o rediseñar el modelo para que coincida con la migración actual.
-- Implementar `ReciboController` con al menos `show()` (ver recibo de una venta) y opcionalmente una vista de impresión.
-- Corregir la creación del recibo en `VentaController::store()` para que persista los datos correctamente.
-- Registrar las rutas.
+**Corrección aplicada (solo persistencia, sin tocar lógica de negocio ni crear funcionalidades nuevas):**
+- Migración `add_monto_to_recibos_table`: agrega `decimal('monto', 10, 2)` — la única columna que `VentaController::store()` ya necesitaba y nunca pudo guardar. No se agregaron `nro_recibo`/`fecha`/`metodo_pago`/`observacion`/`estado`: ningún código los usa hoy, agregarlos habría sido introducir campos sin funcionalidad real.
+- `app/Models/Recibo.php`: se quitó `SoftDeletes` (mismo criterio que `BUG-09` — confirmado por búsqueda exhaustiva que nada llama a `delete()`/`restore()`/`withTrashed()` sobre este modelo); `$fillable` → `['venta_id', 'monto']`; cast `'fecha' => 'datetime'` (columna inexistente) → `'monto' => 'decimal:2'` (mismo patrón que `DetalleVenta::precio_unitario`).
+- `VentaController::store()`: **sin cambios** — el `$venta->recibo()->create([...])` que ya existía pasa a persistir con éxito tal cual estaba escrito.
+
+**Verificado:** `tests/Feature/ReciboPersistenciaTest.php` (nuevo, 3 casos): registrar una venta persiste el recibo con el monto correcto, `Venta::recibo()` es legible sin excepción, `Recibo::count()` ya no lanza el error de `SoftDeletes`. Suite completa: 231 passed, mismo único fallo preexistente no relacionado. Verificado además contra la base de datos real (`farmacia_tfg`, migración aplicada, prueba en una transacción revertida sin residuos): recibo creado, monto correcto, relación `Venta::recibo()` legible.
+
+**`RF10`/`CU11` cerrado por completo (2026-07-28):** se implementó `ReciboController::show()`, la ruta `GET /recibos/{recibo}` y la vista `recibos/show.blade.php`, con el flujo "Ver recibo"/"Nueva venta" desde `ventas/index.blade.php` tras registrar una venta (sin redirección forzada). Se eliminó el botón "Imprimir recibo" de `ventas/create.blade.php` (confirmado como código muerto: no tenía ningún `addEventListener` ni llamaba a `window.print()`). Detalle completo, incluida la verificación manual contra MySQL real, en `docs/modulos.md` (sección "Módulo: Recibos").
 
 ---
 
@@ -430,7 +495,7 @@ El seeder define el permiso `reportes.ver`. El módulo se está implementando de
 - **Orden:** fecha descendente (mismo criterio que `VentaController::index()->latest('fecha_venta')`).
 - **"Unidades vendidas" en vez de conteo de filas:** se usa `SUM(detalles_venta.cantidad)`, no `COUNT(*)` de `detalles_venta`. Un mismo producto puede generar varios `DetalleVenta` si el FIFO de `VentaController::store()` tomó stock de más de un lote — `COUNT(*)` habría mostrado un número inflado por ese detalle de implementación, no la cantidad real de unidades vendidas. Verificado con un caso de prueba dedicado (producto repartido en 2 lotes dentro de la misma venta).
 - **`Venta::getTotalAttribute()` no se reutilizó**, por el mismo motivo que en "Compras" (evitar cálculo en PHP en un listado paginado) y por consistencia con el resto del módulo: total por venta y total general calculados en SQL, sin `HAVING`/`GROUP BY` sobre alias.
-- **Limitación de datos — descuento no persistido (analizada en detalle, no corregida por instrucción explícita):** `VentaController::store()` calcula un total con descuento restado, pero nunca lo persiste (`detalles_venta` no tiene columna `descuento`; el intento de guardar el total en `recibos.monto` se descarta en silencio porque esa columna no existe en la migración de `recibos`, ver `PEND-01`). El total de este reporte es, por lo tanto, el **bruto** reconstruido desde `detalles_venta` (`SUM(cantidad × precio_unitario)`), no el neto realmente cobrado en ventas con descuento. **No es una limitación nueva de este reporte** — `ventas/index.blade.php` ya muestra hoy el mismo cálculo bruto vía `Venta::getTotalAttribute()`, así que el reporte es consistente con lo que el sistema ya muestra en todos lados. Se agregó una nota visible en `reportes/ventas.blade.php` explicando esta limitación, y la columna se etiqueta "Total (bruto)". Corregirlo requeriría agregar una columna `descuento` a `detalles_venta` y modificar `VentaController::store()` — cambio funcional al módulo de Ventas explícitamente fuera de alcance de este sprint.
+- **Limitación de datos — descuento no persistido en `detalles_venta` (analizada en detalle, no corregida por instrucción explícita):** `VentaController::store()` calcula un total con descuento restado y sigue sin persistirlo en `detalles_venta` (esa tabla no tiene columna `descuento`). El total de este reporte es, por lo tanto, el **bruto** reconstruido desde `detalles_venta` (`SUM(cantidad × precio_unitario)`), no el neto realmente cobrado en ventas con descuento. **No es una limitación nueva de este reporte** — `ventas/index.blade.php` ya muestra hoy el mismo cálculo bruto vía `Venta::getTotalAttribute()`. **Nota (2026-07-27):** desde que se corrigió `PEND-01`, el total neto (con descuento) sí queda persistido en `recibos.monto` — pero este reporte no lo usa (fuera de su alcance original, sin cambios de lógica de negocio); sería la fuente correcta si en el futuro se decide mostrar el neto en vez del bruto. Se agregó una nota visible en `reportes/ventas.blade.php` explicando esta limitación, y la columna se etiqueta "Total (bruto)".
 - **Pruebas:** `tests/Feature/ReporteVentasTest.php` (Pest, 20 casos).
 
 **Reporte 6 — "Historial de movimientos de stock" (implementado) — resuelve conjuntamente `AUS-01` y `AUS-02`:**
@@ -443,7 +508,7 @@ El seeder define el permiso `reportes.ver`. El módulo se está implementando de
 - **Columnas:** fecha, producto (vía `lote.producto`), lote, tipo (badge Entrada/Salida), motivo, cantidad, referencia (texto libre).
 - **Filtros:** producto, lote, tipo (Entrada/Salida) y rango de fechas (`desde`/`hasta`, sin período por defecto) — exactamente los 4 filtros pedidos entre `AUS-01` ("por producto o lote") y `AUS-02` ("lote, producto, tipo, fecha"). Sin filtro de `motivo` (no estaba en ninguno de los dos backlogs, decisión explícita del usuario de no ampliar el alcance).
 - **No se usan `MovimientoStock::user()` ni `MovimientoStock::referencia()`:** ambas relaciones están rotas (referencian `user_id`/`referencia_tipo`/`referencia_id`, columnas que no existen en la migración). El campo `referencia` se muestra tal cual, como el texto libre que es. No se corrigieron estas relaciones (fuera de alcance).
-- **`BUG-06` no se corrige:** se filtra por la columna `tipo` (`Entrada`/`Salida`, poblada correctamente por `CompraController`/`VentaController`) en vez de usar `scopeEntradas()`/`scopeSalidas()` (rotos, filtran por el signo de `cantidad`, que siempre es positivo).
+- **`BUG-06` no se corrigió en este sprint** (se filtró por la columna `tipo` directamente para no depender de los scopes rotos) — corregido después, el 2026-07-27, ver su propia entrada más arriba.
 - **Vacío de datos señalado, no corregido:** no hay columna `user_id` real en `movimientos_stock`, así que el reporte no puede mostrar quién generó cada movimiento. Además, hoy en datos reales solo existen movimientos con `motivo IN ('Compra','Venta')` — `Devolucion` y `Ajuste` son valores válidos en el enum pero nunca se generan (`DevolucionController` está vacío — `PEND-02` — y `LoteController::bulkUpdate()` no crea `MovimientoStock` — `PEND-06`). El reporte los soporta igual, por si se implementan más adelante.
 - **Pruebas:** `tests/Feature/ReporteMovimientosTest.php` (Pest, 18 casos).
 
@@ -491,16 +556,16 @@ El sidebar de `app.blade.php` no tiene un enlace al módulo de compras. Para acc
 | **Crítica** | ~~BUG-07~~ | ~~Rutas de permisos sin autenticación~~ ✅ 2026-07-10 |
 | **Crítica** | ~~BUG-08~~ | ~~`User::esAdmin()` devolvía `true` para cualquier usuario (RBAC anulado)~~ ✅ 2026-07-10 |
 | **Alta** | ~~BUG-09~~ | ~~`MovimientoStock` no podía consultarse (`ESQ-05`)~~ ✅ 2026-07-12 |
-| **Alta** | BUG-02 | No se puede editar el precio de un producto |
+| **Alta** | ~~BUG-02~~ | ~~No se puede editar el precio de un producto~~ ✅ 2026-07-27 (además, la creación estaba rota por el mismo motivo) |
 | **Alta** | ~~BUG-04~~ | ~~Ventas pueden despachar lotes vencidos~~ ✅ 2026-07-07 |
 | **Alta** | ~~BUG-05~~ | ~~Registro público de usuarios puede fallar~~ ✅ 2026-07-07 |
-| **Alta** | PEND-01 | Implementar recibos completamente |
+| **Alta** | ~~PEND-01~~ | ~~Recibos: persistencia rota + sin vista para consultarlos~~ ✅ Completo (persistencia 2026-07-27, `ReciboController::show()`/vista/flujo "Ver recibo" 2026-07-28) — `RF10`/`CU11` cerrados |
 | **Alta** | PEND-02 | Implementar devoluciones completamente |
 | **Media** | PEND-03 | Anulación de ventas |
 | **Media** | ~~AUS-01~~ | ~~Módulo de reportes~~ ✅ 6/6 reportes — completado 2026-07-12 |
 | **Media** | ~~AUS-02~~ | ~~Vista de movimientos de stock~~ ✅ resuelto por consolidación con `AUS-01` (Reporte 6) — 2026-07-12 |
 | **Media** | ~~PEND-05~~ | ~~Dashboard con datos reales y alertas~~ ✅ resuelto por migración `UI-05` — 2026-07-14 |
-| **Baja** | BUG-06 | Scopes de movimientos de stock |
+| **Baja** | ~~BUG-06~~ | ~~Scopes de movimientos de stock~~ ✅ 2026-07-27 |
 | **Baja** | PEND-04 | Anulación de compras |
 | **Baja** | PEND-06 | Auditoría en ajustes de stock |
 | **Baja** | PEND-07 | Vistas de lotes duplicadas/rotas (huérfana + bug visual) |
@@ -508,10 +573,12 @@ El sidebar de `app.blade.php` no tiene un enlace al módulo de compras. Para acc
 | **Baja** | PEND-09 | Extraer JS compartido de buscadores a `<x-search-box>` u otro mecanismo |
 | **Alta** | ~~BUG-10~~ | ~~`auth/register.blade.php` extendía `layouts.app` inexistente~~ ✅ 2026-07-21 |
 | **Baja** | BUG-11 | Chip de estado de Ventas nunca refleja pagada/pendiente/anulada |
+| **Crítica** | ~~BUG-12~~ | ~~Módulo de Roles sin protección de acceso real~~ ✅ 2026-07-28 |
+| **Alta** | ~~BUG-13~~ | ~~Permisos `clientes.*` nunca sembrados (CU15 no ejecutable por Vendedor)~~ ✅ 2026-07-28 |
 | **Baja** | AUS-03 | Gestión de permisos desde UI |
 | **Baja** | AUS-04 | Enlace de compras en el sidebar |
 | **Baja** | DATA-01 | Rol "Supervisor 1" sin `proveedors.ver`/`proveedors.eliminar` |
-| **Baja** | ESQ-01 a ESQ-08 (excepto ~~ESQ-05~~ ✅) | Desajustes modelo/migración |
+| **Baja** | ESQ-02 a ESQ-08 (excepto ~~ESQ-01~~ ✅, ~~ESQ-05~~ ✅) | Desajustes modelo/migración |
 
 ---
 

@@ -44,6 +44,15 @@ class PermisoSeeder extends Seeder
             ['slug' => 'proveedors.editar',   'nombre' => 'Editar proveedor'],
             ['slug' => 'proveedors.eliminar', 'nombre' => 'Eliminar proveedor'],
 
+            // CLIENTES
+            // Los slugs ya eran verificados por routes/web.php (permiso:clientes.*)
+            // pero nunca se habían sembrado — el módulo solo funcionaba para
+            // administradores por el bypass de esAdmin(). Ver BUG-13.
+            ['slug' => 'clientes.ver',      'nombre' => 'Ver clientes'],
+            ['slug' => 'clientes.crear',    'nombre' => 'Crear cliente'],
+            ['slug' => 'clientes.editar',   'nombre' => 'Editar cliente'],
+            ['slug' => 'clientes.eliminar', 'nombre' => 'Eliminar cliente'],
+
             // PRODUCTOS / STOCK
             ['slug' => 'productos.ver',     'nombre' => 'Ver productos'],
             ['slug' => 'productos.crear',   'nombre' => 'Crear producto'],

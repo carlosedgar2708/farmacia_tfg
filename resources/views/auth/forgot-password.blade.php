@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('app')
 @section('title','Recuperar contraseña')
 @section('content')
 <section class="grid" style="grid-template-columns:1fr">

@@ -103,13 +103,14 @@ configuraciones (tabla independiente, sin relaciones — clave/valor)
 | `created_at`, `updated_at` | timestamps | |
 | `deleted_at` | timestamp, nullable | Migración lo tiene; el modelo NO usa `SoftDeletes` |
 
-**Permisos predefinidos por seeder (24 en total):**
+**Permisos predefinidos por seeder (29 en total):**
 
 | Módulo | Slugs |
 |---|---|
 | Usuarios | `usuarios.ver`, `usuarios.crear`, `usuarios.editar`, `usuarios.eliminar` |
 | Roles | `rols.ver`, `rols.crear`, `rols.editar`, `rols.eliminar` |
-| Proveedores | `proveedores.ver`, `proveedores.crear`, `proveedores.editar`, `proveedores.eliminar` |
+| Proveedores | `proveedors.ver`, `proveedors.crear`, `proveedors.editar`, `proveedors.eliminar` (el slug real usa `proveedors`, sin `e` — ver nota más abajo) |
+| Clientes | `clientes.ver`, `clientes.crear`, `clientes.editar`, `clientes.eliminar` — agregados el 2026-07-28 (`BUG-13`): las rutas ya los exigían desde siempre, pero nunca se habían sembrado. |
 | Productos/Stock | `productos.ver`, `productos.crear`, `productos.editar`, `productos.eliminar`, `productos.stock` |
 | Compras | `compras.ver`, `compras.crear`, `compras.anular` |
 | Ventas | `ventas.ver`, `ventas.crear`, `ventas.anular` |
@@ -311,9 +312,10 @@ Restricción UNIQUE sobre `(producto_id, nro_lote)`.
 |---|---|---|
 | `id` | bigint, PK | |
 | `venta_id` | bigint, unique, FK → ventas (cascade delete) | |
+| `monto` | decimal(10,2), default 0 | Agregada en `add_monto_to_recibos_table` (2026-07-27, `PEND-01`) |
 | `created_at`, `updated_at` | timestamps | |
 
-**Desajuste crítico:** El modelo tiene `fillable` con `nro_recibo`, `fecha`, `metodo_pago`, `observacion`, `estado`, pero **ninguno de estos campos existe en la migración**. La tabla real solo tiene `venta_id`.
+**Resuelto (2026-07-27):** el modelo tenía `fillable` con `nro_recibo`, `fecha`, `metodo_pago`, `observacion`, `estado`, ninguno existente en la migración, y además usaba `SoftDeletes` sin columna `deleted_at` (mismo bug que `movimientos_stock`, ver más abajo) — cualquier lectura del modelo lanzaba una excepción SQL real. Se quitó `SoftDeletes`, se redujo `fillable` a `venta_id`/`monto` (los únicos campos reales, este último ya usado por `VentaController::store()`), y se agregó la columna faltante. Detalle completo en `docs/pendientes.md` (`PEND-01`, `ESQ-01`).
 
 ---
 
@@ -382,7 +384,7 @@ La siguiente tabla resume los casos donde el modelo Eloquent y la migración de 
 | `Rol` | Migración tiene `deleted_at`; el modelo NO usa el trait `SoftDeletes` |
 | `Permiso` | Migración tiene `deleted_at`; el modelo NO usa el trait `SoftDeletes` |
 | `MovimientoStock` | El modelo usa `SoftDeletes` pero la migración NO tiene `deleted_at` |
-| `Recibo` | `fillable` referencia 5 campos que no existen en la tabla |
+| ~~`Recibo`~~ | ~~`fillable` referencia 5 campos que no existen en la tabla~~ ✅ Corregido (2026-07-27), ver `PEND-01` |
 | `Devolucion` | `fillable` referencia 5 campos que no existen en la tabla |
 | `DetalleDevolucion` | `fillable` referencia 3 campos que no existen en la tabla |
 | `Compra` | `fillable` incluye `observacion` y `estado` que no están en la migración |

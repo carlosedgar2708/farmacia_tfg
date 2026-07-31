@@ -99,3 +99,43 @@ test('peticion sin sesion redirige a login', function () {
 
     $response->assertRedirect('/login');
 });
+
+test('crear producto con precio_venta se guarda correctamente', function () {
+    $response = $this->actingAs($this->admin)->post('/productos', [
+        'codigo' => 'PR-NEW',
+        'nombre' => 'Producto nuevo',
+        'precio_venta' => 12.50,
+    ]);
+
+    $response->assertRedirect(route('productos.index'));
+    $this->assertDatabaseHas('productos', ['codigo' => 'PR-NEW', 'precio_venta' => 12.50]);
+});
+
+test('crear producto sin precio_venta falla la validacion (BUG-02)', function () {
+    $response = $this->actingAs($this->admin)->post('/productos', [
+        'codigo' => 'PR-SINPRECIO',
+        'nombre' => 'Producto sin precio',
+    ]);
+
+    $response->assertSessionHasErrors('precio_venta');
+    $this->assertDatabaseMissing('productos', ['codigo' => 'PR-SINPRECIO']);
+});
+
+test('editar producto permite actualizar precio_venta (BUG-02)', function () {
+    $producto = crearProductoDePrueba('PR-EDIT');
+
+    $response = $this->actingAs($this->admin)->put('/productos/' . $producto->id, [
+        'codigo' => $producto->codigo,
+        'nombre' => $producto->nombre,
+        'precio_venta' => 99.99,
+    ]);
+
+    $response->assertRedirect(route('productos.index'));
+    $this->assertDatabaseHas('productos', ['id' => $producto->id, 'precio_venta' => 99.99]);
+});
+
+test('el formulario de creacion y edicion incluyen el campo precio_venta', function () {
+    $response = $this->actingAs($this->admin)->get('/productos');
+
+    $response->assertSee('name="precio_venta"', false);
+});

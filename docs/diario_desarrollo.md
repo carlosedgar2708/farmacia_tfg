@@ -1205,3 +1205,191 @@ Implementación:
 `rols/index.blade.php` migrado y verificado. Con Clientes, Proveedores y Roles cerrados, el orden acordado por el usuario para los módulos administrativos continúa con: Usuarios (migración completa, no solo su buscador) → Configuración → Login/Register. Después de eso, retomar Lotes (`PEND-07`) y los pendientes funcionales (`BUG-11`, `PEND-09`).
 
 ---
+
+## 2026-07-27 — Sprint UI-05: migración de `users/index.blade.php`, cambio de ritmo del proyecto
+
+A partir de esta sesión el usuario pidió acelerar el cierre de `UI-05`: sin auditorías/reportes largos por módulo, implementación directa cuando no hay decisión arquitectónica real, mismo criterio ya validado (Design System, `UI-05`/`UI-06`), sin tocar lógica de negocio/controladores/BD ni CSS nuevo salvo indispensable.
+
+`users/index.blade.php`: mismo patrón mecánico ya aplicado en Roles/Clientes/Proveedores. `<section class="hero"><div class="panel">` → `<x-card>`; alertas de sesión → `<x-alert>`; botón "Nuevo usuario" → `<x-button variant="primary">`; fila `@empty` → `<x-empty-state>`; botones de ambos modales (Guardar/Cancelar/Cerrar) → `<x-button>`. Buscador ya migrado en `UI-06`, sin tocar. Sin cambios en `UserController` ni en el JS de los modales.
+
+Suite completa: 223 passed, mismo único fallo preexistente no relacionado (`ExampleTest`). Sin tests nuevos (vista ya cubierta por `UsuariosBuscadorTest`; no se detectó necesidad de cobertura adicional para un cambio puramente estructural).
+
+Próximo paso: Configuración (`configuracion/edit.blade.php`).
+
+### Configuración (`configuracion/edit.blade.php`)
+
+Único cambio real: el `<div class="hero"><div class="panel" style="background:#1157c2;color:#fff">` (un `<h1>` decorativo de uso único, sin la clase `page-title` que sí comparten los listados) se colapsó directamente en `<x-card title="Configuración del sistema" icon="ri-settings-3-line">`, a diferencia del criterio de "header fuera del prop `title`" usado en los listados — acá no había ningún patrón de encabezado compartido que preservar. Alerta de éxito → `<x-alert>`, botón "Guardar" → `<x-button variant="primary">`. `ConfiguracionController` sin cambios. De paso se agregó la sección "Módulo: Configuración" a `docs/modulos.md`, que nunca había existido pese a que el módulo se implementó en el sprint de `BUG-04`.
+
+Suite completa: 223 passed, mismo único fallo preexistente no relacionado. Próximo paso: Login/Register.
+
+### Login/Register (cierre de `UI-05`)
+
+`login.blade.php` tenía un layout split-screen con ilustración, degradado y sombra grande (`0 30px 80px`) — la decisión de `UI-02` sobre este módulo ("una columna vs. split-screen") había quedado abierta desde `UI-01`. Se consultó al usuario antes de tocarlo (única pausa de esta sesión: es una decisión de diseño real, no un swap mecánico) y se resolvió a favor de **una columna**: se eliminó la ilustración, el degradado, la sombra exagerada y el bloque `:root` local que duplicaba tokens ya globales; el formulario pasó a `<x-card class="login-card">` centrada. `register.blade.php` (ya tenía `.hero`/`.panel` decorativo) se migró al mismo patrón: `<x-card title="Crear cuenta" icon="ri-user-add-line">`, botones → `<x-button>`. Las reglas de centrado compartidas por ambas vistas (`.login-shell`/`.login-card`) se agregaron una sola vez a `public/css/style.css` (nueva sección §17) en vez de duplicarse en las dos vistas. El resto del CSS de login (`.field`, `.remember`, `.form-head`) sigue local, sin necesidad real de compartirse. Sin cambios en Fortify, `CreateNewUser.php` ni ningún controlador.
+
+Suite completa: 223 passed, mismo único fallo preexistente no relacionado.
+
+### Estado al cierre
+
+**`UI-05` (migración de vistas al Design System) completo.** Todos los módulos administrativos, Dashboard, Reportes (índice), Productos, Compras, Ventas, Configuración y Auth migrados. Pendiente, fuera de este sprint: Lotes (`PEND-07`, bloqueado por una decisión funcional previa, no solo visual) y las 6 subvistas de detalle de Reportes (funcionales, sin migrar visualmente). Próximo paso: a decidir con el usuario — `UI-07` (limpieza final), las subvistas de Reportes, o Lotes.
+
+---
+
+## 2026-07-27 (continuación) — Auditoría final antes de la memoria de tesis
+
+Se pidió una auditoría de cierre (sin refactors, solo bugs funcionales reales, rutas huérfanas, CSS/JS muerto, documentación desactualizada) antes de pasar a la etapa de documentación de la tesis. Resultado: **sin bugs críticos que bloqueen la entrega**. Se aprobaron 4 hallazgos 🟡 para corregir antes de cerrar:
+
+1. **`auth/forgot-password.blade.php` y `auth/reset-password.blade.php` extendían `layouts.app`** (inexistente) — mismo bug que `BUG-10`, nunca replicado el fix a estas dos vistas. Confirmado que `Features::resetPasswords()` no está en `config/fortify.php`, por lo que hoy son código huérfano (sin ruta, sin link en la UI). Se corrigió `@extends('app')` en ambas, sin activar la funcionalidad ni migrarlas al Design System — el pedido explícito era solo eliminar el bug latente.
+2. **`docs/modulos.md`** actualizado: se quitó la descripción del flujo de recuperación de contraseña como si estuviera activo, se agregó una nota explícita de que `Features::resetPasswords()` está deshabilitada y de que ambas vistas son huérfanas (mismo tipo de caso que `PEND-07`).
+3. **`docs/modulos.md` → "Layout y Navegación"** corregida: se quitó "Lotes" de la lista de entradas del sidebar (el `@if (Route::has('lotes.index'))` de `app.blade.php` nunca es verdadero, ese ítem nunca se renderiza) y se agregaron "Reportes" y "Configuración", que sí aparecen y no estaban listados.
+4. **`BUG-02`, `BUG-06`, `BUG-11` revisados:**
+   - `BUG-02` — **corregido**, y con un hallazgo más grave de lo documentado: el modal de **creación** de productos (mismo formulario que edición) tampoco tenía el campo `precio_venta`, pese a que `store()` ya lo exige `required` — confirmado con una petición real que crear un producto desde la UI ya estaba roto, no solo editar el precio. Se agregó el campo al modal compartido (crear + editar), su `data-precio_venta` en el botón "Editar", y la validación en `ProductoController::update()` (mismas reglas que `store()`). Sin cambios de lógica de negocio: se completó un campo que ya existía en modelo/BD/`store()`.
+   - `BUG-06` — **corregido**: `scopeEntradas()`/`scopeSalidas()` de `MovimientoStock` filtraban por el signo de `cantidad` (siempre positivo); ahora filtran por la columna `tipo`. Confirmado por búsqueda exhaustiva que ningún controlador ni vista llamaba a estos scopes (`ReporteController::movimientos()` ya los evitaba deliberadamente), así que el fix no tiene efectos secundarios.
+   - `BUG-11` — **no se tocó**, por instrucción explícita: requiere una decisión de negocio (¿el chip de estado debería reflejar un ciclo de vida real de pago, lo cual implica `PEND-03`? ¿o el mapa de colores debería ajustarse al único valor que el sistema produce hoy?). Se verificó que sigue correctamente documentado como limitación conocida en `docs/pendientes.md`.
+
+**Pruebas nuevas:** `tests/Feature/ProductosIndexTest.php` (+4 casos: creación con precio, creación sin precio falla validación, edición actualiza precio, campo presente en el HTML) y `tests/Feature/MovimientoStockScopesTest.php` (nuevo, 1 caso: `entradas()`/`salidas()` distinguen correctamente por `tipo`).
+
+**Suite completa:** 228 passed, mismo único fallo preexistente no relacionado (`ExampleTest`, `GET /` siempre redirige por diseño).
+
+### Estado al cierre
+
+Implementación funcional cerrada. No quedan hallazgos que requieran código antes de pasar a la memoria de tesis (diagramas, documentación formal). Los ítems 🟢 de la auditoría (vistas huérfanas de Lotes, módulos esqueleto Recibos/Devoluciones/Permisos, `AUS-04`, `ESQ-*`, subvistas de Reportes sin migrar, `BUG-11`) quedan documentados como limitaciones conocidas, sin acción pendiente de código para la entrega.
+
+---
+
+## 2026-07-27 (continuación) — `PEND-01`: corrección de la persistencia del recibo
+
+Se retomó `PEND-01` a raíz de la revisión de RF10/CU11 de la memoria (recibos/comprobantes de venta). El usuario pidió explícitamente diagnóstico primero, sin asumir nada, y corregir **solo la persistencia** — sin tocar ventas, FEFO, stock, `PEND-08`, impresión ni UI, y sin crear funcionalidades nuevas.
+
+### Diagnóstico (verificado empíricamente, no asumido)
+
+Con una prueba temporal (registrar una venta real y leer la tabla `recibos` sin pasar por el modelo, luego eliminada) se confirmó la causa exacta, más grave que lo ya documentado:
+- La migración real de `recibos` solo tenía `id`, `venta_id` (FK única), `created_at`, `updated_at`.
+- El modelo `Recibo` usaba `SoftDeletes` **sin que la migración tuviera `deleted_at`** — el mismo bug que `BUG-09` (`MovimientoStock`), nunca detectado antes para este modelo. Confirmado con una consulta real: `SQLSTATE[HY000]: no such column: recibos.deleted_at`. Esto rompe cualquier **lectura** (`Recibo::count()`, `$venta->recibo`), no la escritura.
+- `VentaController::store()` ya llamaba a `$venta->recibo()->create(['venta_id'=>.., 'monto'=>$total])`. Se confirmó que la fila **sí se insertaba** (con `venta_id`), pero **sin `monto`** — no era `fillable` (que en cambio declaraba `nro_recibo`/`fecha`/`metodo_pago`/`observacion`/`estado`, ninguno real) ni columna existente, así que Eloquent lo descartaba en el mass-assignment.
+- Efecto neto: el recibo se creaba a medias y quedaba **ilegible para siempre** — cualquier vista que lo leyera habría lanzado un error 500 real.
+
+Se confirmó por búsqueda exhaustiva que nada llama a `delete()`/`restore()`/`withTrashed()` sobre `Recibo`, habilitando el mismo tipo de fix que `BUG-09` (quitar el trait sin riesgo).
+
+### Corrección aplicada (aprobada antes de escribir código, dado que implica una migración)
+
+- Nueva migración `add_monto_to_recibos_table`: agrega `decimal('monto', 10, 2)` — la única columna que el controlador ya necesitaba. No se agregaron los otros 4 campos fantasma del `fillable` viejo: ningún código los usa.
+- `app/Models/Recibo.php`: se quitó `SoftDeletes`; `$fillable` → `['venta_id', 'monto']`; cast `fecha` (columna inexistente) → `'monto' => 'decimal:2'` (mismo patrón que `DetalleVenta::precio_unitario`).
+- `VentaController::store()`: **sin cambios** — el `create()` que ya existía pasa a persistir con éxito.
+
+### Verificación
+
+- `tests/Feature/ReciboPersistenciaTest.php` (nuevo, 3 casos): venta crea recibo con monto correcto, `Venta::recibo()` legible sin excepción, `Recibo::count()` ya no lanza el error de `SoftDeletes`.
+- Suite completa: 231 passed, mismo único fallo preexistente no relacionado (`ExampleTest`).
+- Se levantó MySQL de XAMPP (no estaba corriendo) para migrar y verificar contra la base real `farmacia_tfg`: migración aplicada, y una venta real registrada dentro de una transacción revertida confirmó recibo creado (monto correcto) y `Venta::recibo()` legible — sin residuos en la BD real.
+
+### Documentación actualizada
+
+`docs/pendientes.md` (`PEND-01` marcado resuelto en su parte de persistencia, con el diagnóstico completo; `ESQ-01` marcado resuelto; nota de la limitación de descuento en Reporte de Ventas actualizada — el neto ahora sí se persiste en `recibos.monto`, aunque el reporte no lo usa), `docs/base_de_datos.md` (esquema de `recibos` actualizado), `docs/modulos.md` (sección Recibos actualizada).
+
+### Estado al cierre
+
+`PEND-01` resuelto en su parte de persistencia: el recibo se crea, persiste el monto y es legible sin errores. **Sigue pendiente, fuera de este alcance:** `ReciboController` continúa vacío, sin rutas ni vista — no hay forma de ver/imprimir el recibo desde los datos ya persistidos (el botón "Imprimir recibo" sigue siendo solo del navegador). Si se quiere cerrar `RF10`/`CU11` por completo, ese es el trabajo que falta.
+
+---
+
+## 2026-07-28 — Cierre de `RF10`/`CU11`: visualización e impresión del recibo persistido
+
+### Auditoría previa (sin código), a pedido explícito del usuario
+
+Se auditó el flujo completo antes de tocar nada: `ReciboController` (7 métodos vacíos), `Recibo`/`Venta` (relaciones ya correctas desde `PEND-01`), rutas (`grep` confirmó cero rutas `/recibos`), y el botón "Imprimir recibo" de `ventas/create.blade.php`. Hallazgo que corrigió un supuesto del propio pedido: el botón **no imprime "solo del lado del navegador" — no hace absolutamente nada**. Tiene `id="btnTicket"` y una referencia `const $btnTicket = ...`, pero cero `addEventListener` y cero `window.print()`; el propio comentario del código lo delata (`// dejo tu código de ticket igual`). Además, el botón vive en el formulario de creación de la venta, *antes* de que exista el recibo — no hay `venta_id` que enlazar en ese momento.
+
+Se presentó un primer plan (redirigir automáticamente al recibo tras registrar la venta) que el usuario rechazó explícitamente: un cajero de farmacia normalmente sigue registrando ventas, y forzar una redirección al recibo rompería ese flujo. Se rediseñó el plan según instrucción del usuario:
+
+1. Registrar venta → 2. Volver a `ventas.index` (como hoy) → 3. Banner de éxito + botones "Ver recibo"/"Nueva venta" → 4. El usuario decide si entra o sigue vendiendo.
+
+También se corrigió un segundo supuesto durante la auditoría: `ventas/index.blade.php` **no tiene su propio renderizado de `session('success')`** — el único punto de todo el proyecto que lo muestra es el banner global de `app.blade.php` (`{{ session('success') }}`, escapado). El usuario decidió explícitamente **no** tocar ese banner global (mezclaría lógica específica de Ventas en el layout genérico) y en su lugar agregar el bloque "Ver recibo"/"Nueva venta" únicamente en `ventas/index.blade.php`, condicionado a una clave de sesión aparte (`recibo_id`) — sin tocar el mecanismo de flash existente.
+
+### Implementación
+
+- **`app/Http/Controllers/VentaController.php`:** único cambio de lógica — se capturó el `id` del `Recibo` ya creado dentro del `DB::transaction()` (variable por referencia `&$reciboId`, sin tocar `$total`/FEFO/stock/descuentos) y se agregó al redirect: `->with('recibo_id', $reciboId)`.
+- **`routes/web.php`:** `GET /recibos/{recibo}` (`recibos.show`), dentro del grupo `auth` ya existente — mismo criterio que `ventas.*` (sin permiso granular nuevo).
+- **`app/Http/Controllers/ReciboController.php`:** único método implementado, `show()` — carga `venta.cliente`, `venta.user`, `venta.detalles.producto` (evita N+1). Los otros 6 métodos (`index`, `create`, `store`, `edit`, `update`, `destroy`) quedan vacíos, deliberadamente, tal como pidió el usuario.
+- **`resources/views/recibos/show.blade.php`** (nueva): `<x-card title="Recibo N° {{ $recibo->id }}">`, datos (fecha, cliente, vendedor), tabla de productos/cantidad/precio/subtotal, total (`Recibo::monto`), botón `<x-button onclick="window.print()">Imprimir</x-button>`. Reutiliza `.table`/`.table-wrap`/`.money`/`.ta-right` ya existentes, sin CSS nuevo salvo el `@media print` (ver abajo). Único CSS aprobado explícitamente por el usuario ("no es CSS innecesario, es parte de la funcionalidad de impresión"): oculta `.sidebar`, `.main-top`, `.flash`, `footer` y `.print-actions`; resetea el padding de `.main` a 0. Sin cambios de color ni tipografía, agregado vía `@push('styles')` local a esta vista (no al CSS global).
+- **`resources/views/ventas/index.blade.php`:** bloque `@if(session('recibo_id'))` con `<x-button icon="ri-receipt-line">Ver recibo</x-button>` + `<x-button variant="secondary" icon="ri-add-line">Nueva venta</x-button>`, exactamente como lo especificó el usuario. Flash de un solo uso — no persiste tras la siguiente navegación.
+- **`resources/views/ventas/create.blade.php`:** eliminado el botón "Imprimir recibo" (inerte, confirmado en la auditoría) y su referencia JS muerta (`$btnTicket`, `hayItems()`).
+
+### Verificación
+
+- **`tests/Feature/RecibosTest.php`** (nuevo, 6 casos): flujo completo end-to-end (POST `/ventas` → `Recibo` persistido con el monto correcto → redirect a `ventas.index` con `recibo_id` en sesión → la página siguiente muestra "Ver recibo"/"Nueva venta" con el enlace correcto → `GET /recibos/{id}` muestra número/fecha/cliente/vendedor/producto/total → botón "Imprimir" con `onclick="window.print()"` → cliente nulo muestra "—" → `@media print` presente con los selectores esperados → botón inerte de `ventas/create` confirmado eliminado → sin sesión redirige a login).
+- Suite completa: **237 passed**, mismo único fallo preexistente no relacionado (`ExampleTest`).
+- **Verificación manual contra MySQL real:** se levantó `php artisan serve` temporal + Chrome (MCP), login real (`admin@farmacia.com`), 2 ventas registradas de punta a punta desde la interfaz real. Ambas mostraron el banner "Venta registrada correctamente." con los botones "Ver recibo"/"Nueva venta"; el recibo abierto coincidió exactamente con los datos de cada venta (producto, cantidad, precio unitario, total); el segundo "Ver recibo" apuntó al recibo N° 3, no al N° 2 anterior (confirmado leyendo el `href` real); volver a `/ventas` y registrar una segunda venta no tuvo ninguna fricción (flujo de caja intacto). **No se hizo clic real en "Imprimir"** — dispararía el diálogo nativo de impresión del SO, que habría bloqueado la sesión de automatización del navegador (riesgo señalado explícitamente por la skill de automatización). En su lugar se verificó, vía JavaScript en la página, que el botón tiene exactamente `onclick="window.print()"` y que los 6 selectores del `@media print` corresponden a elementos reales del layout. Datos de prueba (2 ventas, sus detalles, recibos y movimientos de stock) limpiados de la BD real al finalizar, con el stock de los productos restaurado a sus valores originales.
+
+### Documentación actualizada
+
+`docs/pendientes.md` (`PEND-01` marcado completo — persistencia + `RF10`/`CU11`), `docs/modulos.md` (nueva sección "Módulo: Recibos"; secciones de Ventas actualizadas: nota sobre `recibo_id` en la ruta `POST /ventas`, bloque "Ver recibo"/"Nueva venta" en el listado, botón "Imprimir recibo" documentado como eliminado en el formulario de creación).
+
+### Estado al cierre
+
+`RF10`/`CU11` cerrados por completo, con el alcance mínimo pedido: sin listado de recibos, sin edición/eliminación/búsqueda/filtros, sin numeración automática, sin estados, sin campos nuevos. El sistema y la memoria de la tesis ya coinciden en este punto.
+
+---
+
+## 2026-07-28 — Auditoría de consistencia memoria/código y corrección de `BUG-12` (Roles sin protección RBAC)
+
+### Contexto
+
+Antes de continuar redactando la memoria de tesis, el usuario pidió auditar capítulo por capítulo la consistencia entre lo documentado (capítulo 3: modelo de negocio, requerimientos, casos de uso) y el sistema real, verificando siempre contra el código y citando archivo/línea, sin asumir nada. Se auditaron actores, requerimientos funcionales, casos de uso, roles y permisos, navegación, reportes y recibos.
+
+### Hallazgo principal: `BUG-12` — Roles sin ninguna protección de acceso real
+
+Durante la verificación de "qué middleware protege cada ruta", se detectó que `routes/web.php` registraba `rols.*` con `Route::resource('rols', RolController::class)->only([...])` **sin ningún `middleware('permiso:rols.*')`** — a diferencia de Productos, Compras, Clientes, Proveedores, Usuarios y Reportes, todos protegidos por ruta. Se verificó exhaustivamente que no había ninguna otra capa de defensa: `RolController` sin `esAdmin()`/`tienePermiso()` internos, sin `Gate::` en ningún Provider, `bootstrap/app.php` sin middleware global, y `rols/index.blade.php` sin ningún botón condicionado por permiso. Efecto real: cualquier usuario autenticado —incluido un Vendedor— podía crear, editar (incluida la asignación de permisos) y eliminar cualquier rol, incluido "Administrador". Se registró primero en `docs/pendientes.md` como `BUG-12` (siguiendo el formato habitual de bugs del proyecto) antes de tocar nada, y se presentó un plan de corrección que el usuario confirmó con dos ajustes explícitos: no tocar `rols/index.blade.php` (el gating de botones por permiso no es un patrón uniforme todavía en Productos/Clientes/Proveedores, se difiere a un sprint de UX/RBAC) y no tocar el sidebar (ya es consistente con el resto del sistema, que tampoco filtra el menú por permiso salvo Configuración).
+
+### Corrección aplicada
+
+- **`routes/web.php`:** se reemplazó el `Route::resource(...)->only([...])` por rutas explícitas, mismo patrón que Usuarios/Clientes/Proveedores: `permiso:rols.ver` (index), `permiso:rols.crear` (store), `permiso:rols.editar` (update), `permiso:rols.eliminar` (destroy). Los 4 slugs ya existían en `PermisoSeeder`, no se sembró nada nuevo.
+- **`RolController.php`:** sin cambios.
+- **Tests:** `tests/Feature/RolesIndexTest.php` y `tests/Feature/RolesBuscadorTest.php` autenticaban usuarios sin ningún rol asignado — se actualizaron con el mismo patrón ya usado en `ProveedoresIndexTest.php` (rol Administrador con los 4 permisos `rols.*`, rol Vendedor sin ellos, test nuevo de bloqueo 403 en ambos archivos). También se corrigieron dos tests de otros archivos que dependían de la ausencia de protección (`FieldErrorsTest.php`, `FormErrorsTest.php`), y se ajustó el test "sin roles se muestra el estado vacío" de `RolesIndexTest.php`, que ya no puede vaciar la tabla `rols` por completo sin romper el propio permiso del admin de la prueba — se cambió a filtrar por una búsqueda sin resultados.
+
+### Verificación
+
+- Suite completa: `php artisan test` → 239 passed, 1 failed (`ExampleTest`, mismo fallo preexistente no relacionado).
+- Verificación manual contra la BD real (`farmacia_tfg`): `php artisan serve` temporal + `curl` con las cuentas reales del seeder. Login `admin@farmacia.com` → `GET /rols` → `200`, contenido real de la vista ("LISTA DE ROLES"). Login `vendedor@farmacia.com` → `GET /rols` → `403`, cuerpo "No autorizado" del `PermisoMiddleware`. Servidor temporal detenido y cookies eliminadas al finalizar.
+
+### Documentación actualizada
+
+`docs/pendientes.md` (`BUG-12` registrado y marcado ✅ corregido, con el diagnóstico completo y la corrección aplicada; fila agregada en la Tabla de Priorización), `docs/modulos.md` (nueva nota de corrección en "Módulo: Roles", mismo estilo que la nota ya existente de `BUG-01`).
+
+### Estado al cierre
+
+El módulo de Roles queda protegido por permiso, igual que el resto de módulos administrativos. Queda pendiente, deliberadamente fuera de este fix, un sprint futuro de UX/RBAC que unifique el ocultamiento de botones por permiso en las vistas (hoy solo lo hace `users/index.blade.php`) y evalúe si el sidebar debería filtrar por permiso en vez de por existencia de ruta. La auditoría de la memoria de tesis continúa en la próxima sesión.
+
+---
+
+## 2026-07-28 — Inicio de la revisión capítulo a capítulo de la memoria + `BUG-13` (permisos de Clientes nunca sembrados)
+
+### Cambio de enfoque
+
+A partir de esta sesión el usuario pidió dejar el desarrollo en segundo plano y centrarse en dejar la memoria de tesis (capítulo por capítulo, empezando por el Capítulo 3 — Análisis del Sistema) exactamente alineada con el sistema implementado. Regla acordada: no tocar código salvo que aparezca una inconsistencia crítica que impida que la memoria sea verdadera.
+
+### Hallazgo durante el cierre del Capítulo 3: `BUG-13`
+
+Al revisar `CU15` ("Asociar cliente a una venta", actor Vendedor) contra el RBAC ya corregido por `BUG-12`, se detectó que agregar `clientes.crear` al rol Vendedor (según lo acordado) no bastaba: el permiso **no existía en absoluto** en `PermisoSeeder.php`. El módulo de Clientes es el único de todo el sistema cuyas rutas (`permiso:clientes.ver/crear/editar/eliminar` en `routes/web.php`) verifican permisos que el seeder nunca definió — confirmado también por `docs/base_de_datos.md`, cuya tabla de "24 permisos" nunca tuvo una fila "Clientes". El módulo solo funcionaba para Administrador por el bypass de `esAdmin()`; para cualquier otro rol era estructuralmente imposible otorgar acceso, porque el permiso ni siquiera existía para asignarlo.
+
+Se presentó la disyuntiva al usuario (corregir el código vs. reformular `CU15` en la memoria) vía pregunta explícita; el usuario eligió corregir el código por ser el cambio mínimo y porque la memoria ya describía el comportamiento deseado correctamente.
+
+### Corrección aplicada
+
+- `database/seeders/PermisoSeeder.php`: nueva sección `CLIENTES` con los 4 slugs ya exigidos por las rutas.
+- `database/seeders/RolSeeder.php`: se agregó `clientes.crear` (no `ver`/`editar`/`eliminar`) a los permisos del rol Vendedor — coherente con `CU15` (crea un cliente al vuelo durante la venta) sin darle acceso al directorio completo, que sigue siendo de Administrador (`CU06`).
+- Re-sembrado contra la base de datos real: `php artisan db:seed --class=PermisoSeeder` seguido de `--class=RolSeeder`.
+
+### Verificación
+
+- Catálogo de permisos: 29 en total (antes 25).
+- `php artisan test`: 239 passed, 1 failed (`ExampleTest`, preexistente, no relacionado).
+- Verificación manual contra la BD real: login `vendedor@farmacia.com` vía `php artisan serve` temporal + `curl`, `POST /clientes` → `201` (antes `403`). Cliente de prueba eliminado (`forceDelete()`) al finalizar.
+
+### Documentación actualizada
+
+`docs/pendientes.md` (`BUG-13` registrado y marcado ✅ corregido; fila agregada en la Tabla de Priorización), `docs/base_de_datos.md` (tabla de permisos: se agregó la fila "Clientes", se corrigió el conteo a 29, y se corrigió de paso el slug documentado de Proveedores de `proveedores.*` a `proveedors.*`, que ya era el real desde antes).
+
+### Estado al cierre
+
+Con `BUG-12` y `BUG-13` corregidos, el Capítulo 3 de la memoria (procesos de negocio, actores, RF, CU, roles y permisos) ya coincide con el sistema real sin reservas pendientes. Continúa la revisión de la memoria con los diagramas UML en la próxima sesión.
+
+---

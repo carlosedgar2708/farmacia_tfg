@@ -124,7 +124,6 @@
           <input id="cambio" type="number" step="0.01" value="0.00" readonly>
 
           <x-button type="submit" variant="primary" icon="ri-check-line" style="width:100%;margin-top:10px">Aceptar</x-button>
-          <x-button type="button" variant="secondary" icon="ri-printer-line" id="btnTicket" style="width:100%;margin-top:8px">Imprimir recibo</x-button>
         </x-card>
 
         <div id="itemsHidden"></div>
@@ -561,12 +560,6 @@ function addHidden(name, value){
   i.value=value;
   $itemsHidden.appendChild(i);
 }
-
-/* ===== Ticket térmico (80mm) ===== */
-// dejo tu código de ticket igual
-const $btnTicket = document.getElementById('btnTicket');
-function hayItems(){ return document.querySelectorAll('#tbl tbody tr').length > 0; }
-// ... resto del ticket igual que ya lo tienes ...
 
 /* =========================================================
    RECONSTRUCCIÓN TRAS ERROR DE VALIDACIÓN (PEND-08)

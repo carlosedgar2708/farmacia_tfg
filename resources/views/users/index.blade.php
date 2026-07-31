@@ -13,15 +13,14 @@
   })->values();
 @endphp
 
-<section class="hero">
-  <div class="panel">
-    <h1 class="h-top" style="color:#7dd3fc">Lista de usuarios</h1>
+<x-card>
+    <h1 class="h-top">Lista de usuarios</h1>
 
     @if (session('success'))
-      <div class="alert alert-success">{{ session('success') }}</div>
+      <x-alert variant="success">{{ session('success') }}</x-alert>
     @endif
     @if (session('error'))
-      <div class="alert alert-danger">{{ session('error') }}</div>
+      <x-alert variant="danger">{{ session('error') }}</x-alert>
     @endif
 
     <div class="toolbar">
@@ -35,7 +34,7 @@
       </form>
 
       @if(auth()->user()->tienePermiso('usuarios.crear'))
-        <button class="btn" type="button" onclick="openCreateUserModal()">+ Nuevo usuario</button>
+        <x-button variant="primary" icon="ri-add-line" type="button" onclick="openCreateUserModal()">Nuevo usuario</x-button>
       @endif
     </div>
 
@@ -102,15 +101,13 @@
           </td>
         </tr>
       @empty
-        <tr><td colspan="5" class="empty">Sin registros.</td></tr>
+        <tr><td colspan="5"><x-empty-state message="No hay usuarios registrados." /></td></tr>
       @endforelse
       </tbody>
     </table>
 
     <div style="margin-top:10px">{{ $users->withQueryString()->links() }}</div>
-  </div>
-  <div class="shadow"></div>
-</section>
+</x-card>
 @endsection
 
 @push('modals')
@@ -173,8 +170,8 @@
           @error('roles') <small class="field-error">{{ $message }}</small> @enderror
 
           <div class="modal-actions">
-            <button class="btn" id="userSubmit" type="submit">Guardar</button>
-            <button class="btn btn-outline" type="button" onclick="closeUserModal()">Cancelar</button>
+            <x-button type="submit" variant="primary" id="userSubmit">Guardar</x-button>
+            <x-button type="button" variant="secondary" onclick="closeUserModal()">Cancelar</x-button>
           </div>
         </div>
       </div>
@@ -208,7 +205,7 @@
         <label>Roles</label>
         <div id="v_roles" class="perm-list"></div>
         <div class="modal-actions">
-          <button class="btn-outline" data-close>Cerrar</button>
+          <x-button type="button" variant="secondary" data-close>Cerrar</x-button>
         </div>
       </div>
     </div>

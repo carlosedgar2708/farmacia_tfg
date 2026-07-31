@@ -512,3 +512,15 @@ input:focus, select:focus{ outline:2px solid var(--success) }
   display:block; margin-top:4px;
   font-size:12px; color:var(--accent);
 }
+
+/* =========================================================
+   17) Auth — layout de una columna (login/register, UI-05)
+   ========================================================= */
+/* Compartido por ambas vistas de auth tras eliminar el layout split-screen
+   con ilustración/degradado que tenía login (decisión de UI-02, resuelta a
+   favor de una columna). Sin colores/tokens nuevos. */
+.login-shell{
+  min-height: calc(100vh - 44px);
+  display:grid; place-items:center;
+}
+.login-card{ width:min(420px, 92vw); }

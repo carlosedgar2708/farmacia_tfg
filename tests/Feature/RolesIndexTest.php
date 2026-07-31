@@ -1,18 +1,33 @@
 <?php
 
+use App\Models\Permiso;
 use App\Models\Rol;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->rolAdmin = Rol::create(['nombre' => 'Administrador', 'slug' => 'admin']);
+    $this->rolVendedor = Rol::create(['nombre' => 'Vendedor', 'slug' => 'vendedor']);
+
+    foreach (['rols.ver', 'rols.crear', 'rols.editar', 'rols.eliminar'] as $slug) {
+        $permiso = Permiso::create(['slug' => $slug, 'nombre' => $slug]);
+        $this->rolAdmin->permisos()->attach($permiso->id);
+    }
+    // El vendedor NO tiene ningun permiso rols.*, para probar el bloqueo (BUG-12).
+
     $this->admin = crearUsuarioDePrueba();
+    $this->admin->rols()->attach($this->rolAdmin->id);
+
+    $this->vendedor = crearUsuarioDePrueba();
+    $this->vendedor->rols()->attach($this->rolVendedor->id);
 });
 
 test('sin roles se muestra el estado vacio del Design System', function () {
-    Rol::query()->delete();
-
-    $response = $this->actingAs($this->admin)->get('/rols');
+    // No se puede borrar Rol::all() (rompería el propio rol del admin que
+    // necesita rols.ver desde BUG-12): se filtra con una búsqueda sin
+    // resultados para forzar la lista paginada vacía en su lugar.
+    $response = $this->actingAs($this->admin)->get('/rols?q=inexistente-xyz');
 
     $response->assertStatus(200);
     $response->assertSee('No hay roles registrados.');
@@ -65,6 +80,12 @@ test('los botones clave del modal conservan sus ids para el JavaScript existente
     foreach (['submitBtn', 'cancelBtn'] as $id) {
         $response->assertSee('id="' . $id . '"', false);
     }
+});
+
+test('acceso sin permiso rols.ver es bloqueado con 403', function () {
+    $response = $this->actingAs($this->vendedor)->get('/rols');
+
+    $response->assertStatus(403);
 });
 
 test('peticion sin sesion redirige a login', function () {

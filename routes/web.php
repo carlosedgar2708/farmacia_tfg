@@ -16,6 +16,7 @@ use App\Http\Controllers\VentaController;
 use App\Http\Controllers\CompraController;
 use App\Http\Controllers\ConfiguracionController;
 use App\Http\Controllers\ReporteController;
+use App\Http\Controllers\ReciboController;
 
 
 Route::middleware(['auth'])->group(function () {
@@ -26,6 +27,8 @@ Route::middleware(['auth'])->group(function () {
     // Aux (AJAX) – lotes con stock por producto
     Route::get('/api/productos/{producto}/lotes', [VentaController::class, 'lotesPorProducto'])
          ->name('api.productos.lotes');
+
+    Route::get('/recibos/{recibo}', [ReciboController::class, 'show'])->name('recibos.show');
 });
 
 /*
@@ -94,7 +97,12 @@ Route::middleware('auth')->group(function () {
 
 
     // === ROLES ===
-    Route::resource('rols', RolController::class)->only(['index','store','update','destroy']);
+    Route::prefix('rols')->name('rols.')->group(function () {
+        Route::middleware('permiso:rols.ver')->get('/', [RolController::class, 'index'])->name('index');
+        Route::middleware('permiso:rols.crear')->post('/', [RolController::class, 'store'])->name('store');
+        Route::middleware('permiso:rols.editar')->put('/{rol}', [RolController::class, 'update'])->name('update');
+        Route::middleware('permiso:rols.eliminar')->delete('/{rol}', [RolController::class, 'destroy'])->name('destroy');
+    });
 
     // === USUARIOS ===
     Route::prefix('users')->name('users.')->group(function () {

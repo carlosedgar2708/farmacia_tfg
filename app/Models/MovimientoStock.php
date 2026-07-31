@@ -62,18 +62,22 @@ class MovimientoStock extends Model
     // ---------------------------------------------------------
 
     /**
-     * Filtra los movimientos que son entradas (cantidad > 0)
+     * Filtra los movimientos que son entradas.
+     * Corregido (BUG-06): filtraba por el signo de `cantidad`, que
+     * `CompraController`/`VentaController` siempre guardan positivo —
+     * ambos scopes devolvían los mismos datos. Se filtra por `tipo`,
+     * la columna que sí distingue entradas de salidas.
      */
     public function scopeEntradas($query)
     {
-        return $query->where('cantidad', '>', 0);
+        return $query->where('tipo', 'Entrada');
     }
 
     /**
-     * Filtra los movimientos que son salidas (cantidad < 0)
+     * Filtra los movimientos que son salidas (ver nota en scopeEntradas).
      */
     public function scopeSalidas($query)
     {
-        return $query->where('cantidad', '<', 0);
+        return $query->where('tipo', 'Salida');
     }
 }

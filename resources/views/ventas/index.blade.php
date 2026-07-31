@@ -10,6 +10,12 @@
       <x-button variant="primary" icon="ri-add-line" href="{{ route('ventas.create') }}">Nueva venta</x-button>
     </div>
 
+    @if(session('recibo_id'))
+      <div class="mt-12">
+        <x-button icon="ri-receipt-line" href="{{ route('recibos.show', session('recibo_id')) }}">Ver recibo</x-button>
+        <x-button variant="secondary" icon="ri-add-line" href="{{ route('ventas.create') }}">Nueva venta</x-button>
+      </div>
+    @endif
 
     <div class="table-wrap">
       <table class="table table-soft">

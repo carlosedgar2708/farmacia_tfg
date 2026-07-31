@@ -37,6 +37,7 @@ class RolSeeder extends Seeder
             $slugs = [
                 'ventas.ver', 'ventas.crear',
                 'productos.ver',
+                'clientes.crear', // registrar un cliente nuevo durante la venta (CU15)
                 'devoluciones.registrar',
                 // si quieres que vea reportes de sus ventas:
                 // 'reportes.ver',
