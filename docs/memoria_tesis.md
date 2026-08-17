@@ -19,7 +19,8 @@
 | 2 | Marco Teórico / Antecedentes | ⏳ Pendiente — no revisado todavía |
 | 3 | Materiales y Métodos (Análisis del Sistema) | ✅ **Verificado** (2026-07-28) |
 | — | Diagramas UML | 🟡 **Parcial** — Diagrama General de Casos de Uso 🟡 (falta CU12 en EA); resto de diagramas (clases, secuencia, etc.) pendientes |
-| 4+ | (resto de la memoria) | ⏳ Pendiente — no revisado todavía |
+| 4 | Modelo de Prueba | 🟡 **Parcial** (2026-08-05) — §4.1 y §4.2 (casos de prueba de Registrar Ventas y Registrar Compras) verificados; faltan más casos de uso en §4.2, y conclusiones/recomendaciones aún no escritas |
+| 5+ | (resto de la memoria) | ⏳ Pendiente — no revisado todavía |
 
 ---
 
@@ -72,6 +73,38 @@ Dos inconsistencias críticas fueron detectadas durante la auditoría de este ca
 2. **`BUG-13` — Los permisos `clientes.*` nunca se sembraron.** CU15 documentaba que el Vendedor puede registrar un cliente nuevo durante la venta, pero `PermisoSeeder.php` nunca definió ningún permiso `clientes.*`, pese a que las rutas de Clientes ya los exigían — el módulo solo funcionaba para Administrador por el bypass de `esAdmin()`. **Resuelto:** se agregó la sección `CLIENTES` al seeder de permisos y se otorgó `clientes.crear` (no el CRUD completo) al rol Vendedor, coherente con el alcance exacto de CU15. Verificado manualmente: `vendedor@farmacia.com` → `POST /clientes` responde `201` (antes `403`). Detalle completo en `docs/pendientes.md` (`BUG-13`) y `docs/diario_desarrollo.md` (2026-07-28).
 
 **Nota de arquitectura, no corregida (no impide que la memoria sea verdadera, se deja como está):** las rutas de Ventas y Recibos (`routes/web.php`) están protegidas solo por `auth`, no por `permiso:ventas.*` — a diferencia de todos los demás módulos administrativos. Los permisos `ventas.ver`/`ventas.crear` existen y están asignados a Vendedor, pero ningún middleware los verifica. Hoy no causa una contradicción con la memoria porque los dos roles existentes (Admin, Vendedor) deberían tener acceso de todas formas, pero es una diferencia arquitectónica frente al resto del sistema que conviene tener presente si se agrega un tercer rol en el futuro.
+
+---
+
+## Capítulo 4 — Modelo de Prueba
+
+**Estado: 🟡 Parcial (2026-08-05)**
+
+Verificados hasta ahora: §4.1 (Concepto/Objetivos/Principios de la Prueba de Software, Caja Negra/Caja Blanca — contenido teórico, no verificable contra código) y §4.2 con dos casos de prueba (Registrar Ventas, Registrar Compras), contrastados línea por línea contra `VentaController::store()`, `CompraController::store()` y `ventas/index.blade.php`. Faltan por escribir/verificar: el resto de casos de uso de §4.2 (el capítulo cubre por ahora solo 2 de los 14 CU vigentes, ver `docs/requisitos.md`), y las secciones de Conclusiones y Recomendaciones.
+
+### 4.2.1. Caso de Uso: Registrar Ventas
+
+✅ Verificado contra `app/Http/Controllers/VentaController.php::store()`:
+- Precio unitario siempre recalculado desde `Producto::precio_venta` (línea 112), el valor enviado por el formulario se ignora — coincide con el texto.
+- Descuento forzado a `0` si `!auth()->user()->esAdmin()` (línea 114) — coincide.
+- FEFO: consulta de lotes con `Lote::vigentes()` + `orderByRaw('fecha_vencimiento IS NULL, fecha_vencimiento ASC')` + `lockForUpdate()` (líneas 117-122) — coincide, excluye lotes vencidos antes de aplicar el orden.
+- Stock insuficiente → `ValidationException::withMessages(["items.$i.cantidad" => "Stock insuficiente para {producto}. Disponible: {stock} unidades."])` (líneas 128-131) — el sistema no registra nada y devuelve al formulario conservando los demás datos (`PEND-08`), coincide con el flujo alterno descrito.
+- Por cada lote descontado: `DetalleVenta::create()` + `Lote::decrement('stock')` + `MovimientoStock::create()` con `tipo='Salida'`/`motivo='Venta'` (líneas 148-165) — coincide.
+- Recibo generado incondicionalmente al final de la transacción, `reciboId` devuelto en el redirect (líneas 184-195) — coincide con "genera automáticamente el recibo" y los botones "Ver recibo"/"Nueva venta" (`docs/modulos.md` § Recibos).
+
+**Observación (matiz de redacción, no un error funcional):** el texto dice que la venta "queda registrada como 'público en general'" cuando no se indica cliente. En la implementación real, `cliente_id` simplemente queda `NULL` — no se persiste ningún literal "público en general"; el listado de ventas (`ventas/index.blade.php:42`) muestra `—` para ese caso. Sí existe un botón **"Público en general"** en el formulario (`ventas/create.blade.php:84`) que el usuario pulsa para dejar la venta sin cliente, así que la idea de fondo es correcta — es una simplificación aceptable para la redacción del caso de prueba, no una afirmación falsa sobre el sistema.
+
+### 4.2.2. Caso de Uso: Registrar Compras
+
+✅ Verificado contra `app/Http/Controllers/CompraController.php::store()`:
+- `proveedor_id` obligatorio, valida existencia en `proveedors` (línea 66) — coincide.
+- Lote con fecha de vencimiento pasada → `ValidationException::withMessages(["items.$i.fecha_vencimiento" => "El lote {$nroLote} está vencido. No puedes ingresarlo."])` (líneas 98-102) — el mensaje citado en el caso de prueba coincide **textualmente, carácter por carácter**, con el mensaje real del código. Toda la transacción se revierte (nada se registra), coincide con el flujo alterno descrito.
+- Lote nuevo → se crea con `stock=0` y se incrementa después (líneas 110-118, 138) — coincide.
+- Lote existente → actualiza `costo_unitario` siempre ("último costo registrado") y `fecha_vencimiento` solo si vino informada (líneas 119-127) — coincide.
+- Por cada ítem: `DetalleCompra::create()` + incremento de stock + `MovimientoStock` `tipo='Entrada'`/`motivo='Compra'` — coincide.
+- Redirect a `compras.index` con `'Compra registrada correctamente.'` — coincide.
+
+Sin observaciones — no se encontró ninguna discrepancia entre el texto y el código.
 
 ---
 

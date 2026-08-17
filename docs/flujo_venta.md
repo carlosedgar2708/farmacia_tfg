@@ -1,5 +1,7 @@
 # Flujo de una Venta — Farmacia Katy
 
+**Trazabilidad con la tesis:** corresponde a `CU10` "Registrar ventas" (`RF09` Registro de Ventas + `RF10` Generación de Comprobantes), memoria de tesis §3.5.3. Ver `docs/requisitos.md` para el catálogo completo de RF/CU.
+
 ## Descripción General
 
 El módulo de ventas permite registrar la salida de productos del inventario hacia un cliente (identificado o anónimo). El sistema descuenta el stock automáticamente siguiendo una estrategia **FIFO por fecha de vencimiento** (se despachan primero los lotes que vencen antes). El precio de venta siempre se toma de la base de datos, nunca del formulario. Los descuentos solo están disponibles para usuarios administradores.
@@ -13,6 +15,8 @@ El módulo de ventas permite registrar la salida de productos del inventario hac
 | Usuario autenticado | Middleware `auth` |
 | Registrar venta | Autenticado (sin permiso granular en la ruta principal) |
 | Aplicar descuentos | Solo administradores (`esAdmin() === true`) |
+
+**Discrepancia con la tesis:** la especificación de `CU10` (§3.5.3, tabla "Excepciones") lista "Falta de permisos" como excepción del flujo de venta. En la implementación actual, `POST /ventas` **no tiene middleware `permiso:`** — solo requiere `auth` (ver `routes/web.php`). Cualquier usuario autenticado, sin importar su rol, puede registrar una venta; no existe un permiso granular `ventas.crear` que se esté verificando. A diferencia de Compras (que sí exige `permiso:compras.crear`), esta excepción de la tesis no es reproducible en el código actual.
 
 ---
 
@@ -157,9 +161,13 @@ Esta consulta implementa la estrategia **FIFO por vencimiento**:
 ```php
 $stockTotal = $lotes->sum('stock');
 if ($stockTotal < $cantidadSolicitada) {
-    abort(422, "Stock insuficiente para el producto ID {$productoId}. Disponible total: {$stockTotal}");
+    throw ValidationException::withMessages([
+        "items.$i.cantidad" => "Stock insuficiente para {$producto->nombre}. Disponible: {$stockTotal} unidades.",
+    ]);
 }
 ```
+
+**Nota (PEND-08):** el stock insuficiente ya no se trata como error duro (`abort(422)`). Se lanza una `ValidationException` sobre el campo `items.$i.cantidad`, lo que hace que Laravel redirija de vuelta al formulario `/ventas/create` conservando `old()` y `$errors`, igual que cualquier otro error de validación — el usuario puede corregir la cantidad sin perder el resto de la venta cargada.
 
 **e) Descuento de stock lote por lote (FIFO):**
 
@@ -210,27 +218,30 @@ $importeItem = ($cantidadSolicitada * $precioUnitario) - $descuento;
 $total += $importeItem;
 ```
 
-### 4.3 — Creación del Recibo (Intento)
+### 4.3 — Creación del Recibo
 
-Al finalizar todos los ítems, el sistema intenta crear el recibo:
+Al finalizar todos los ítems, el sistema crea el recibo:
 
 ```php
 if (method_exists($venta, 'recibo')) {
-    $venta->recibo()->create([
+    $recibo = $venta->recibo()->create([
         'venta_id' => $venta->id,
         'monto'    => $total,
     ]);
+    $reciboId = $recibo->id;
 }
 ```
 
-**Estado actual:** Este bloque siempre se ejecuta (el método `recibo()` existe en el modelo `Venta`), pero el campo `monto` no existe en la tabla `recibos`. La operación falla silenciosamente porque el intento de inserción lanza una excepción que no está siendo capturada en este contexto — o Laravel descarta el campo desconocido. El recibo **no se genera correctamente** en el estado actual del código.
+**Estado actual (corregido 2026-07-28):** la migración `2026_07_28_014202_add_monto_to_recibos_table.php` agregó la columna `monto` (`decimal(10,2)`, default `0`) a la tabla `recibos`, y `Recibo::$fillable` ya la incluye. El recibo **se crea correctamente** con el total de la venta, y su `id` se guarda en `$reciboId` para usarse en la respuesta (ver Paso 5).
 
 ---
 
 ## Paso 5 — Respuesta al Usuario
 
 ```php
-return redirect()->route('ventas.index')->with('success', 'Venta registrada correctamente.');
+return redirect()->route('ventas.index')
+    ->with('success', 'Venta registrada correctamente.')
+    ->with('recibo_id', $reciboId);
 ```
 
 ---
@@ -286,16 +297,16 @@ Usuario
                           ├── $esAdmin ? descuento : 0
                           ├── SELECT lotes WHERE producto_id + stock>0
                           │   ORDER BY vencimiento ASC (FIFO) FOR UPDATE
-                          ├── ¿Stock total < cantidad? → abort(422)
+                          ├── ¿Stock total < cantidad? → ValidationException (vuelve a /create con $errors)
                           │
                           └── Por cada lote (FIFO hasta agotar cantidad):
                                   ├── INSERT detalles_venta (lote_id, cantidad, precio)
                                   ├── UPDATE lotes SET stock = stock - tomar
                                   └── INSERT movimientos_stock (tipo=Salida, motivo=Venta)
                   │
-                  ├── (intento) INSERT recibos → falla silenciosamente
+                  ├── INSERT recibos (venta_id, monto) → $reciboId
                   │
-                  └── redirect ventas.index + flash success
+                  └── redirect ventas.index + flash success + recibo_id
 ```
 
 ---

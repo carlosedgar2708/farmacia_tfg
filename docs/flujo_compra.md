@@ -1,5 +1,7 @@
 # Flujo de una Compra — Farmacia Katy
 
+**Trazabilidad con la tesis:** corresponde a `CU09` "Registrar compras" (`RF08` Registro de Compras), memoria de tesis §3.5.4. La excepción "Falta de permisos" de esa especificación sí es reproducible acá: `POST /compras` exige `permiso:compras.crear` (a diferencia de Ventas, ver nota en `docs/flujo_venta.md`). Ver `docs/requisitos.md` para el catálogo completo de RF/CU.
+
 ## Descripción General
 
 El módulo de compras permite registrar la adquisición de mercancía a un proveedor. Cada compra puede contener múltiples productos, y cada producto se ingresa especificando su número de lote farmacéutico, fecha de vencimiento, costo unitario y cantidad. El sistema crea o actualiza los lotes correspondientes, incrementa el stock y deja registro en el historial de movimientos.

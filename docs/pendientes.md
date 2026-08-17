@@ -266,6 +266,19 @@ Pero `VentaController::store()` **siempre** guarda `'estado' => 'confirmada'` �
 
 ---
 
+### AUS-05 — Falta el permiso granular `ventas.crear`/`ventas.ver` (discrepancia con `CU10` de la tesis)
+
+**Módulo:** Ventas / RBAC
+**Detectado:** 2026-08-02, durante la auditoría de trazabilidad entre la memoria de tesis y el código (ver `docs/requisitos.md`).
+
+**Diagnóstico:** `routes/web.php:23-25` registra `GET /ventas`, `GET /ventas/create` y `POST /ventas` únicamente bajo el grupo `auth`, sin ningún middleware `permiso:`. A diferencia de Compras (`permiso:compras.ver`/`compras.crear`), no existe forma de restringir el módulo de Ventas a un subconjunto de roles — cualquier usuario autenticado puede listar, ver el formulario y registrar ventas.
+
+**Efecto:** la especificación de `CU10` "Registrar ventas" (memoria de tesis §3.5.3, tabla "Excepciones") documenta "Falta de permisos" como una excepción del flujo, pero esa excepción no es reproducible en el código actual — no hay ningún chequeo que pueda fallar.
+
+**No corregido** — pendiente de decisión: ¿agregar `permiso:ventas.crear`/`ventas.ver` siguiendo el mismo patrón que Compras (requeriría sembrar los slugs correspondientes en `PermisoSeeder`/`RolSeeder`), o dejarlo documentado como decisión de diseño intencional (cualquier usuario autenticado puede vender, sin distinción de rol)? No se modifica nada hasta que se resuelva esta pregunta.
+
+---
+
 ## Problemas de Datos (asignaciones de roles/permisos, no bugs de código)
 
 ### DATA-01 — Rol "Supervisor 1" con permisos de proveedores incompletos
@@ -317,7 +330,7 @@ Estos no son bugs activos (no causan errores ahora mismo) pero causarán errores
 
 ---
 
-### PEND-02 — Devoluciones
+### PEND-02 — Devoluciones (`RF11`/`CU12`, `RF14`/`CU13` reporte asociado)
 
 **Estado:** Modelos y migraciones existen pero con desajuste grave. Controlador vacío. Sin rutas ni vistas.
 
@@ -560,7 +573,7 @@ El sidebar de `app.blade.php` no tiene un enlace al módulo de compras. Para acc
 | **Alta** | ~~BUG-04~~ | ~~Ventas pueden despachar lotes vencidos~~ ✅ 2026-07-07 |
 | **Alta** | ~~BUG-05~~ | ~~Registro público de usuarios puede fallar~~ ✅ 2026-07-07 |
 | **Alta** | ~~PEND-01~~ | ~~Recibos: persistencia rota + sin vista para consultarlos~~ ✅ Completo (persistencia 2026-07-27, `ReciboController::show()`/vista/flujo "Ver recibo" 2026-07-28) — `RF10`/`CU11` cerrados |
-| **Alta** | PEND-02 | Implementar devoluciones completamente |
+| **Alta** | PEND-02 | Implementar devoluciones completamente (`RF11`/`CU12`) |
 | **Media** | PEND-03 | Anulación de ventas |
 | **Media** | ~~AUS-01~~ | ~~Módulo de reportes~~ ✅ 6/6 reportes — completado 2026-07-12 |
 | **Media** | ~~AUS-02~~ | ~~Vista de movimientos de stock~~ ✅ resuelto por consolidación con `AUS-01` (Reporte 6) — 2026-07-12 |
@@ -577,6 +590,7 @@ El sidebar de `app.blade.php` no tiene un enlace al módulo de compras. Para acc
 | **Alta** | ~~BUG-13~~ | ~~Permisos `clientes.*` nunca sembrados (CU15 no ejecutable por Vendedor)~~ ✅ 2026-07-28 |
 | **Baja** | AUS-03 | Gestión de permisos desde UI |
 | **Baja** | AUS-04 | Enlace de compras en el sidebar |
+| **Media** | AUS-05 | Falta permiso granular `ventas.crear`/`ventas.ver` (discrepancia con `CU10` de la tesis) |
 | **Baja** | DATA-01 | Rol "Supervisor 1" sin `proveedors.ver`/`proveedors.eliminar` |
 | **Baja** | ESQ-02 a ESQ-08 (excepto ~~ESQ-01~~ ✅, ~~ESQ-05~~ ✅) | Desajustes modelo/migración |
 
