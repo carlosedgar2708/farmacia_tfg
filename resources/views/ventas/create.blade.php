@@ -24,7 +24,7 @@
 
         {{-- para que solo el admin pueda editar el descuento --}}
         @if($esAdmin)
-        <div class="ctrl"> <label>Descuento</label><input id="ctrl_desc" type="number" step="0.01" value="0.00" min="0"></div>
+        <div class="ctrl"> <label>Descuento</label><input id="ctrl_desc" type="number" step="0.01" placeholder="0.00" min="0"></div>
         @else
 
     {{-- empleado NO lo ve --}}
@@ -84,16 +84,7 @@
             <x-button type="button" variant="secondary" icon="ri-user-3-line" id="btnPublico">Público en general</x-button>
           </div>
 
-          {{-- ===== ¿Emitir recibo? ===== --}}
-          <div class="row" style="margin-top:12px">
-            <label style="font-weight:700">¿Emitir recibo?</label>
-            <label style="display:flex;align-items:center;gap:8px">
-              <input id="emitirRecibo" type="checkbox" checked>
-              <span>Sí</span>
-            </label>
-          </div>
-
-          <div id="comprobantesBox" class="two" style="margin-top:6px">
+          <div id="comprobantesBox" class="two" style="margin-top:12px">
             <div>
               <label>Tipo comprobante</label>
               <select id="tipoComp" name="tipo_comprobante">
@@ -109,16 +100,13 @@
 
           <label>Observación</label>
           <input type="text" name="observacion" placeholder="(opcional)" value="{{ old('observacion') }}">
-
-          {{-- hidden para mandar 1/0 --}}
-          <input type="hidden" name="emitir_recibo" id="emitir_recibo" value="1">
         </x-card>
 
         <x-card title="Realizar venta" icon="ri-cash-line">
           <div class="total-badge" id="totalBadge">0.00</div>
 
           <label>Cantidad recibida</label>
-          <input id="recibido" type="number" step="0.01" value="0.00">
+          <input id="recibido" type="number" step="0.01" placeholder="0.00">
 
           <label>Cambio</label>
           <input id="cambio" type="number" step="0.01" value="0.00" readonly>
@@ -363,7 +351,7 @@ function agregarFila(){
 
   recalcTotal();
   $qty.value=1;
-  $desc.value='0.00';
+  $desc.value='';
   $buscador.focus();
   productoSel=null;      // para obligar a seleccionar de nuevo
   $stock.value='0';
@@ -520,22 +508,7 @@ $formNuevoCliente.addEventListener('submit', async (e)=>{
 });
 
 /* ─────────────────────────────────────────────────────────
-   5) ¿Emitir recibo? (toggle muestra/oculta)
-   ───────────────────────────────────────────────────────── */
-const $emitirRecibo   = document.getElementById('emitirRecibo');
-const $emitir_recibo  = document.getElementById('emitir_recibo');
-const $comprobantesBox= document.getElementById('comprobantesBox');
-
-function syncReciboUI(){
-  const on = $emitirRecibo.checked;
-  $emitir_recibo.value = on ? '1' : '0';
-  $comprobantesBox.style.display = on ? '' : 'none';
-}
-$emitirRecibo.addEventListener('change', syncReciboUI);
-syncReciboUI();
-
-/* ─────────────────────────────────────────────────────────
-   6) Envío: construir items[i][...]
+   5) Envío: construir items[i][...]
    ───────────────────────────────────────────────────────── */
 $form.addEventListener('submit', (e)=>{
   $itemsHidden.innerHTML='';

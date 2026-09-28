@@ -19,7 +19,7 @@ class VentaController extends Controller
 {
     public function index()
     {
-        $ventas = Venta::with(['cliente', 'user', 'detalles'])
+        $ventas = Venta::with(['cliente', 'user', 'detalles', 'recibo'])
             ->latest('fecha_venta')
             ->paginate(12);
 

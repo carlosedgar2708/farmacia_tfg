@@ -27,6 +27,7 @@
             <th>Registró</th>
             <th>Estado</th>
             <th class="ta-right">Total</th>
+            <th>Recibo</th>
           </tr>
         </thead>
         <tbody>
@@ -47,10 +48,17 @@
                 </span>
               </td>
               <td class="ta-right money">Bs. {{ number_format($v->total, 2) }}</td>
+              <td>
+                @if($v->recibo)
+                  <x-button variant="secondary" icon="ri-printer-line" href="{{ route('recibos.show', $v->recibo->id) }}">Imprimir recibo</x-button>
+                @else
+                  —
+                @endif
+              </td>
             </tr>
           @empty
             <tr>
-              <td colspan="6">
+              <td colspan="7">
                 <x-empty-state message="No hay ventas registradas." />
               </td>
             </tr>

@@ -63,10 +63,12 @@ La vista presenta dos paneles:
 **Panel derecho — Datos de la transacción:**
 - Buscador de cliente con autocomplete (cliente opcional — si no se selecciona, la venta se registra sin cliente identificado).
 - Opción para crear un cliente nuevo vía modal AJAX.
-- Checkbox "Emitir recibo", tipo de comprobante (Ticket/Factura), folio, monto recibido y cálculo de cambio.
+- Tipo de comprobante (Ticket/Factura), folio, cantidad recibida y cálculo de cambio.
 - Botón "Confirmar Venta".
 
-**Nota:** Los campos de recibo (tipo comprobante, folio, monto recibido) se envían al servidor pero `VentaController::store()` no los procesa actualmente. Son parte de una funcionalidad incompleta.
+**Nota:** Los campos de recibo (tipo comprobante, folio) se envían al servidor pero `VentaController::store()` no los procesa actualmente. Son parte de una funcionalidad incompleta, independiente de la generación automática del recibo (que sí ocurre siempre, ver Paso 4.3).
+
+**Cambio de productividad/impresión (2026-08-16):** se eliminó el checkbox "¿Emitir recibo?" — era puramente cosmético (solo mostraba/ocultaba el bloque de tipo de comprobante/folio vía JS, `syncReciboUI()`), no estaba en las reglas de `$request->validate()` ni se usaba en ningún punto de `store()`, y el recibo siempre se generó automáticamente. Los campos "Descuento" (panel izquierdo) y "Cantidad recibida" ya no inician en `0.00`: aparecen vacíos con `placeholder="0.00"` para no obligar al usuario a borrar el valor antes de escribir. El campo "Cantidad" mantiene su default `1` (caso de uso más común). Detalle completo en `docs/diario_desarrollo.md` (entrada 2026-08-16).
 
 **Construcción del payload:**
 Al hacer submit, JavaScript genera campos hidden con la estructura:

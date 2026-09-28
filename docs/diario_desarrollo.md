@@ -1393,3 +1393,29 @@ Se presentó la disyuntiva al usuario (corregir el código vs. reformular `CU15`
 Con `BUG-12` y `BUG-13` corregidos, el Capítulo 3 de la memoria (procesos de negocio, actores, RF, CU, roles y permisos) ya coincide con el sistema real sin reservas pendientes. Continúa la revisión de la memoria con los diagramas UML en la próxima sesión.
 
 ---
+
+## 2026-08-16
+
+### Mejora de productividad e impresión en el módulo Ventas
+
+Pedido del usuario: impresión de recibo por venta individual (no solo el último registrado), adaptar la impresión a impresora térmica (58mm/80mm), eliminar la pregunta "¿Emitir recibo?" (ya no tiene utilidad, el recibo se genera automáticamente) y quitar los valores iniciales `0.00` de los campos numéricos que el usuario debe completar en `ventas/create`. Sin cambios de lógica de negocio (FIFO, stock, descuentos, validaciones del `store()`).
+
+**Auditoría previa (sin tocar código hasta confirmar el plan):**
+- `Venta::recibo()` ya es un `hasOne(Recibo::class, 'venta_id')` — relación 1:1 explotable directamente, sin necesidad de nada nuevo.
+- El `recibo_id` de sesión (`session('recibo_id')`) solo identifica el recibo de la venta recién registrada (flash de un solo uso); no existía ningún enlace por fila en el listado.
+- El checkbox "¿Emitir recibo?" no estaba en las reglas de `$request->validate()` de `VentaController::store()` ni se usaba en ningún otro punto del controlador — confirmado 100% cosmético, solo mostraba/ocultaba `#comprobantesBox` (Tipo comprobante/Folio, funcionalidad aparte, ya documentada como no persistida) vía `syncReciboUI()`.
+- Los `0.00` de los campos numéricos eran valores fijos en el HTML (`value="0.00"`), sin relación con el JS de cálculo, que ya tolera campos vacíos (`parseFloat(x.value||'0')`).
+
+**Cambios aplicados:**
+- `app/Http/Controllers/VentaController.php`: `index()` ahora hace eager load de `recibo` (`with(['cliente','user','detalles','recibo'])`) para poder enlazar cada fila a su propio recibo sin N+1. Sin cambios en `store()`.
+- `resources/views/ventas/index.blade.php`: nueva columna "Recibo" en la tabla — botón "Imprimir recibo" (icono impresora) por fila que enlaza a `route('recibos.show', $v->recibo->id)`, o `—` si la venta no tiene recibo asociado. Se mantiene intacto el bloque `session('recibo_id')` ("Ver recibo"/"Nueva venta" tras registrar), que sigue funcionando como acceso rápido al último recibo. `colspan` del estado vacío ajustado de 6 a 7.
+- `resources/views/recibos/show.blade.php`: la tarjeta normal se envolvió en `<x-card class="recibo-normal">` (se oculta solo al imprimir) y se agregó un bloque `.ticket-print` con los mismos datos (número, fecha, cliente, vendedor, productos/cantidad/precio/subtotal, total — nada nuevo), oculto en pantalla y visible solo en `@media print`. El `@media print` ahora también define `@page { size: 80mm auto; margin: 0 }` y un ancho de ticket controlado por la variable `--ticket-width: 72mm` (comentario en el propio CSS explica cómo cambiar a 58mm: `--ticket-width: 48mm` + `size: 58mm auto`, ambos a mano porque `var()` dentro de `@page` no tiene soporte confiable entre navegadores/impresoras). `.ticket-print` además fija `max-width:100%` y `margin:0 auto` para que, si el navegador o la impresora ignoran `@page` y usan Letter por defecto, el contenido siga angosto y centrado en vez de estirarse a toda la hoja.
+- `resources/views/ventas/create.blade.php`: eliminado el bloque "¿Emitir recibo?" (checkbox + hidden `emitir_recibo`) y la función `syncReciboUI()` junto con sus listeners — código muerto tras quitar el checkbox. `#comprobantesBox` (Tipo comprobante/Folio) se dejó intacto y siempre visible, sin tocar esa funcionalidad (independiente, fuera de este alcance). Los campos `#ctrl_desc` (Descuento) y `#recibido` (Cantidad recibida) pasaron de `value="0.00"` a vacíos con `placeholder="0.00"`; el reset tras "Agregar" cambió de `$desc.value='0.00'` a `''`. `#ctrl_cantidad` se dejó con `value="1"` (default útil, no un "0.00" a limpiar). No se tocó `recalcTotal()`/`agregarFila()`: ya eran tolerantes a campos vacíos.
+
+**Verificación:**
+- `php artisan test`: 239 passed, 1 failed (`ExampleTest`, mismo fallo preexistente no relacionado). Todos los tests de `RecibosTest`, `VentasIndexTest` y `VentaStockRecoveryTest` pasan sin modificarlos.
+- Verificación manual contra la base de datos real (`farmacia_tfg`, vía `php artisan serve` temporal + `curl` con `admin@farmacia.com`, producto y lote de prueba): se registraron dos ventas del mismo producto (2 y 3 unidades) → recibos con montos distintos (31.00 y 46.50) correctamente vinculados 1:1. En `/ventas`, cada fila mostró su propio botón "Imprimir recibo" apuntando al `/recibos/{id}` correcto (confirmado que el botón de la primera venta no apunta al recibo de la segunda, ni viceversa); el bloque de sesión siguió mostrando el último recibo aparte, sin conflicto. `/recibos/{id}` renderiza el bloque `.ticket-print` con los mismos datos que la vista normal, y el CSS de impresión ya no contiene ninguna referencia a tamaño Letter (`size: 80mm auto` confirmado, sin `size: Letter`). `/ventas/create` confirmado sin "¿Emitir recibo?"/`emitirRecibo`/`emitir_recibo`/`syncReciboUI` en el HTML, con `#ctrl_desc` y `#recibido` sin `value` (solo `placeholder="0.00"`) y `#ctrl_cantidad` conservando `value="1"`; `#comprobantesBox` sigue presente. Datos de prueba (2 ventas, detalles, recibos, movimientos de stock, lote y producto temporal) eliminados de la BD real al finalizar (`forceDelete()`).
+
+**Sin cambios:** `ReciboController`, `Recibo`/`DetalleVenta`/`Venta` (modelos), reglas de validación de `VentaController::store()`, `#comprobantesBox` (Tipo comprobante/Folio). No se creó ningún endpoint ni tabla nueva de recibos.
+
+---
